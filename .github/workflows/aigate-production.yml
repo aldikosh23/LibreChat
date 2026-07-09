@@ -1,0 +1,48 @@
+name: AIGate LibreChat Production
+
+on:
+  push:
+    branches:
+      - codex/aigate-sso-billing
+      - aigate-production
+  workflow_dispatch:
+
+concurrency:
+  group: aigate-librechat-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy on OVH
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Trust production host
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.DEPLOY_PORT || 22 }}" "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'ubuntu' }}
+          DEPLOY_REPO: https://github.com/${{ github.repository }}.git
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+          DEPLOY_SHA: ${{ github.sha }}
+          LIBRECHAT_PUBLIC_URL: https://chat.aigate.shop
+        run: |
+          ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_REPO='$DEPLOY_REPO' DEPLOY_BRANCH='$DEPLOY_BRANCH' DEPLOY_SHA='$DEPLOY_SHA' LIBRECHAT_PUBLIC_URL='$LIBRECHAT_PUBLIC_URL' bash -s" \
+            < ops/deploy-aigate-production.sh
+
+      - name: Smoke public URL when DNS exists
+        run: bash ops/smoke-aigate-production.sh
