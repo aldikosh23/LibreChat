@@ -43,6 +43,7 @@ import SendButton from './SendButton';
 import EditBadges from './EditBadges';
 import BadgeRow from './BadgeRow';
 import Mention from './Mention';
+import AigateBalanceMeter from './AigateBalanceMeter';
 import store from '~/store';
 
 interface ChatFormProps {
@@ -420,6 +421,12 @@ const ChatForm = memo(function ChatForm({
                 }
               />
               <div className="mx-auto flex" />
+              <AigateBalanceMeter
+                index={index}
+                endpoint={conversation?.endpoint ?? endpoint}
+                conversationId={conversationId}
+                isSubmitting={isSubmitting}
+              />
               <TokenUsage index={index} conversation={conversation} isSubmitting={isSubmitting} />
               {SpeechToText && (
                 <AudioRecorder

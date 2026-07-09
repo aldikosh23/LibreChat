@@ -456,6 +456,7 @@ if (cluster.isMaster) {
     app.use('/api/memories', routes.memories);
     app.use('/api/permissions', routes.accessPermissions);
     app.use('/api/tags', routes.tags);
+    app.use('/api/aigate', routes.aigate);
     app.use('/api/mcp', routes.mcp);
 
     /** 404 for unmatched API routes */
