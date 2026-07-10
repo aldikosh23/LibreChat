@@ -46,6 +46,7 @@ import BadgeRow from './BadgeRow';
 import Mention from './Mention';
 import AigateBalanceMeter from './AigateBalanceMeter';
 import { getAigateBalanceEndpoint } from '~/utils/aigateBilling';
+import useSetIndexOptions from '~/hooks/Conversations/useSetIndexOptions';
 import store from '~/store';
 
 interface ChatFormProps {
@@ -78,6 +79,7 @@ const ChatForm = memo(function ChatForm({
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   useFocusChatEffect(textAreaRef);
   const localize = useLocalize();
+  const { setOption } = useSetIndexOptions();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [, setIsScrollable] = useState(false);
@@ -430,6 +432,28 @@ const ChatForm = memo(function ChatForm({
                 }
               />
               <div className="mx-auto flex" />
+              {balanceEndpoint === 'AIGate' && (
+                <label
+                  className="flex min-w-fit items-center gap-1 rounded-full border border-border-light bg-surface-tertiary px-2 py-1 text-xs text-text-secondary"
+                  title={localize('com_endpoint_reasoning_effort')}
+                >
+                  <span className="hidden sm:inline">
+                    {localize('com_endpoint_reasoning_effort')}
+                  </span>
+                  <select
+                    className="bg-transparent text-text-primary outline-none"
+                    value={conversation?.reasoning_effort ?? ''}
+                    onChange={(event) => setOption('reasoning_effort')(event.target.value)}
+                    aria-label={localize('com_endpoint_reasoning_effort')}
+                  >
+                    <option value="">{localize('com_ui_off')}</option>
+                    <option value="low">{localize('com_ui_low')}</option>
+                    <option value="medium">{localize('com_ui_medium')}</option>
+                    <option value="high">{localize('com_ui_high')}</option>
+                    <option value="xhigh">{localize('com_ui_xhigh')}</option>
+                  </select>
+                </label>
+              )}
               <AigateBalanceMeter
                 index={index}
                 endpoint={balanceEndpoint}

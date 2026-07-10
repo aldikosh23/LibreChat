@@ -57,14 +57,28 @@ export default function AigateMessageCost({ message, conversationId }: Props) {
       return;
     }
     let active = true;
+    let retryTimer: number | undefined;
     void loadConversationCosts(conversationId).then((costs) => {
       const cost = costs[message.messageId];
       if (active && Number.isFinite(cost) && cost > 0) {
         setRemoteCost(cost);
+        return;
       }
+      conversationCostRequests.delete(conversationId);
+      retryTimer = window.setTimeout(() => {
+        void loadConversationCosts(conversationId).then((freshCosts) => {
+          const freshCost = freshCosts[message.messageId];
+          if (active && Number.isFinite(freshCost) && freshCost > 0) {
+            setRemoteCost(freshCost);
+          }
+        });
+      }, 1000);
     });
     return () => {
       active = false;
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
     };
   }, [conversationId, localCost, message.isCreatedByUser, message.messageId, persistedCost]);
 
