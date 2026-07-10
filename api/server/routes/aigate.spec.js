@@ -4,6 +4,7 @@ const request = require('supertest');
 jest.mock('~/models', () => ({
   createUser: jest.fn(),
   findUser: jest.fn(),
+  getMessages: jest.fn(),
   getUserKey: jest.fn(),
   updateUserKey: jest.fn(),
 }));
@@ -22,7 +23,7 @@ jest.mock('~/server/services/AuthService', () => ({
   setAuthTokens: jest.fn(),
 }));
 
-const { findUser, getUserKey, updateUserKey } = require('~/models');
+const { findUser, getMessages, getUserKey, updateUserKey } = require('~/models');
 const { setAuthTokens } = require('~/server/services/AuthService');
 const aigateRouter = require('./aigate');
 
@@ -195,6 +196,31 @@ describe('AIGate routes', () => {
       expect.objectContaining({
         headers: expect.objectContaining({ authorization: 'Bearer sk-claimed' }),
       }),
+    );
+  });
+
+  it('returns persisted response costs only for the authenticated conversation', async () => {
+    getMessages.mockResolvedValue([
+      { messageId: 'assistant-1', metadata: { usage: { cost: 0.006124 } } },
+      { messageId: 'assistant-2', metadata: { usage: { cost_usd: '0.000008' } } },
+      { messageId: 'assistant-3', metadata: { usage: {} } },
+    ]);
+
+    const response = await request(app)
+      .get('/api/aigate/costs?conversationId=conversation-1')
+      .set('authorization', 'Bearer session');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      costs: { 'assistant-1': 0.006124, 'assistant-2': 0.000008 },
+    });
+    expect(getMessages).toHaveBeenCalledWith(
+      {
+        conversationId: 'conversation-1',
+        user: 'libre-user-1',
+        isCreatedByUser: false,
+      },
+      'messageId metadata',
     );
   });
 });

@@ -1,6 +1,6 @@
 const express = require('express');
 const { getServerManagedKeyName } = require('librechat-data-provider');
-const { createUser, findUser, getUserKey, updateUserKey } = require('~/models');
+const { createUser, findUser, getMessages, getUserKey, updateUserKey } = require('~/models');
 const { requireJwtAuth } = require('~/server/middleware');
 const { setAuthTokens } = require('~/server/services/AuthService');
 
@@ -32,7 +32,9 @@ function parseStoredUserKey(rawKey) {
         baseURL: typeof parsed.baseURL === 'string' ? parsed.baseURL.trim() : '',
       };
     }
-  } catch {}
+  } catch {
+    return null;
+  }
 
   return null;
 }
@@ -138,7 +140,9 @@ async function handleSso(req, res) {
     const user = await findOrCreateAigateUser(claim.user);
     const endpoint = getAigateEndpoint();
     const apiKey = String(claim.apiKey || '').trim();
-    const baseURL = String(claim.baseURL || process.env.AIGATE_API_BASE_URL || DEFAULT_API_BASE_URL).trim();
+    const baseURL = String(
+      claim.baseURL || process.env.AIGATE_API_BASE_URL || DEFAULT_API_BASE_URL,
+    ).trim();
 
     if (String(claim.endpoint || '').trim() !== endpoint || !apiKey) {
       throw new Error('AIGate API key is missing');
@@ -196,6 +200,36 @@ router.get('/balance', requireJwtAuth, async (req, res) => {
     return res.status(200).send(payload);
   } catch {
     return res.status(502).send({ error: 'AIGate balance unavailable' });
+  }
+});
+
+router.get('/costs', requireJwtAuth, async (req, res) => {
+  const rawConversationId =
+    typeof req.query.conversationId === 'string' ? req.query.conversationId.trim() : '';
+  const conversationId = cleanId(rawConversationId);
+  if (!conversationId || conversationId !== rawConversationId) {
+    return res.status(400).send({ error: 'invalid conversation id' });
+  }
+
+  try {
+    const messages = await getMessages(
+      { conversationId, user: req.user.id, isCreatedByUser: false },
+      'messageId metadata',
+    );
+    const costs = {};
+    for (const message of messages || []) {
+      const cost = Number(
+        message?.metadata?.usage?.cost ??
+          message?.metadata?.usage?.cost_usd ??
+          message?.metadata?.usage?.costUSD,
+      );
+      if (message?.messageId && Number.isFinite(cost) && cost > 0) {
+        costs[message.messageId] = cost;
+      }
+    }
+    return res.status(200).send({ costs });
+  } catch {
+    return res.status(500).send({ error: 'message costs unavailable' });
   }
 });
 

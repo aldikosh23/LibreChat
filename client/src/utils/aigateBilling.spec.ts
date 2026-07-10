@@ -75,6 +75,15 @@ describe('aigate billing helpers', () => {
     ).toBeNull();
   });
 
+  it('falls back to the balance decrease when token used is unchanged', () => {
+    expect(
+      getAigateUsageCostDelta(
+        { remainingUsd: 10, usedUsd: 0, unlimited: true },
+        { remainingUsd: 9.875, usedUsd: 0, unlimited: true },
+      ),
+    ).toBeCloseTo(0.125);
+  });
+
   it('reads persisted response cost from metadata usage', () => {
     const message = {
       conversationId: 'convo',

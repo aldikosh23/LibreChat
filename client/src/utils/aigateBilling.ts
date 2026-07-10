@@ -68,8 +68,15 @@ export function getAigateUsageCostDelta(
   if (!before || !after) {
     return null;
   }
-  const delta = after.usedUsd - before.usedUsd;
-  return delta > 0 ? delta : null;
+  const usedDelta = after.usedUsd - before.usedUsd;
+  if (usedDelta > 0) {
+    return usedDelta;
+  }
+  if (usedDelta < 0) {
+    return null;
+  }
+  const balanceDelta = before.remainingUsd - after.remainingUsd;
+  return balanceDelta > 0 ? balanceDelta : null;
 }
 
 export function getAigateMessageCost(message?: TMessage | null): number | null {
