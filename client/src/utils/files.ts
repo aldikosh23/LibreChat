@@ -344,6 +344,14 @@ const isProviderAttachType = (type: string, ctx: UploadOptionContext): boolean =
   if (currentProvider.toLowerCase() === Providers.OPENROUTER) {
     currentProvider = Providers.OPENROUTER;
   }
+  if (currentProvider.toLowerCase() === 'aigate') {
+    return (
+      type.startsWith('image/') ||
+      type.startsWith('video/') ||
+      type.startsWith('audio/') ||
+      type === 'application/pdf'
+    );
+  }
   const isAzureWithResponsesApi =
     (currentProvider === EModelEndpoint.azureOpenAI ||
       ctx.endpointType === EModelEndpoint.azureOpenAI) &&

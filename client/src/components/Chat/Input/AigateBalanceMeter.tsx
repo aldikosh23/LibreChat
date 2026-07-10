@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { dataService } from 'librechat-data-provider';
 import type { AigateBalanceSnapshot } from '~/utils/aigateBilling';
 import {
   formatAigateUsd,
@@ -34,15 +35,7 @@ export default function AigateBalanceMeter({
     }
 
     try {
-      const res = await fetch(`/api/aigate/balance?endpoint=${encodeURIComponent(endpoint)}`, {
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      if (!res.ok) {
-        setBalance(null);
-        return null;
-      }
-      const payload = await res.json().catch(() => null);
+      const payload = await dataService.getAigateBalance(endpoint);
       const nextBalance = parseAigateBalance(payload);
       setBalance(nextBalance);
       return nextBalance;
@@ -95,11 +88,11 @@ export default function AigateBalanceMeter({
     return null;
   }
 
-  const label = balance.unlimited ? 'balance' : 'key left';
+  const label = balance.unlimited ? 'Баланс' : 'Осталось';
 
   return (
     <div
-      className="hidden min-w-fit items-center rounded-full border border-border-light bg-surface-tertiary px-2.5 py-1 text-xs text-text-secondary sm:flex"
+      className="flex min-w-fit items-center rounded-full border border-border-light bg-surface-tertiary px-2.5 py-1 text-xs text-text-secondary"
       title="AIGate balance"
     >
       <span className="mr-1 text-text-tertiary">{label}</span>

@@ -153,6 +153,10 @@ export function getUserBalance(): Promise<t.TBalanceResponse> {
   return request.get(endpoints.balance());
 }
 
+export function getAigateBalance(endpoint: string): Promise<unknown> {
+  return request.get(endpoints.aigateBalance(endpoint));
+}
+
 export const updateTokenCount = (text: string) => {
   return request.post(endpoints.tokenizer(), { arg: text });
 };

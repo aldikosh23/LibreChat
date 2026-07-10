@@ -19,6 +19,8 @@ type FetchOptions = RequestInit & { dispatcher?: Dispatcher };
 type OpenAIConfiguration = NonNullable<t.OpenAIConfiguration>;
 
 const OPENROUTER_DEFAULT_PARAMS = { promptCache: true };
+const AIGATE_MEDIA_MODEL_PATTERN =
+  /image|video|gemini-omni|flux|muse|dall-e|imagen|ideogram|recraft|seedream|midjourney|stable-diffusion|veo|sora|kling|seedance/i;
 
 function includesOpenRouter(value?: string | null): boolean {
   return typeof value === 'string' && value.toLowerCase().includes(KnownEndpoints.openrouter);
@@ -107,6 +109,12 @@ export function getOpenAIConfig(
     reverseProxyUrl: baseURL,
   } = options;
   const shouldProtectUserBaseURL = options.baseURLIsUserProvided === true && !!baseURL;
+  const isAigate =
+    endpoint?.toLowerCase() === 'aigate' || baseURL?.toLowerCase().includes('api.aigate.shop');
+  const effectiveStreaming =
+    isAigate && AIGATE_MEDIA_MODEL_PATTERN.test(String(modelOptions.model ?? ''))
+      ? false
+      : streaming;
   const ssrfAgents = shouldProtectUserBaseURL
     ? createSSRFSafeAgents(options.allowedAddresses)
     : undefined;
@@ -187,7 +195,7 @@ export function getOpenAIConfig(
       apiKey,
       baseURL,
       endpoint,
-      streaming,
+      streaming: effectiveStreaming,
       addParams,
       dropParams,
       defaultParams,
@@ -294,7 +302,7 @@ export function getOpenAIConfig(
     }) as unknown as Fetch;
   }
 
-  if (endpoint?.toLowerCase() === 'aigate') {
+  if (isAigate) {
     configOptions.fetch = createAigateMediaFetch(configOptions.fetch as Fetch | undefined);
   }
 

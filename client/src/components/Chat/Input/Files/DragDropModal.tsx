@@ -40,6 +40,7 @@ const DragDropModal = () => {
     if (currentProvider.toLowerCase() === Providers.OPENROUTER) {
       currentProvider = Providers.OPENROUTER;
     }
+    const isAigate = currentProvider.toLowerCase() === 'aigate';
     const isAzureWithResponsesApi =
       (currentProvider === EModelEndpoint.azureOpenAI ||
         endpointType === EModelEndpoint.azureOpenAI) &&
@@ -47,7 +48,8 @@ const DragDropModal = () => {
     return (
       isDocumentSupportedProvider(endpointType) ||
       isDocumentSupportedProvider(currentProvider) ||
-      isAzureWithResponsesApi
+      isAzureWithResponsesApi ||
+      isAigate
     );
   }, [provider, endpoint, endpointType, useResponsesApi]);
 

@@ -376,6 +376,16 @@ describe('getOpenAIConfig', () => {
     expect(result.provider).toBe('openrouter');
   });
 
+  it('uses non-streaming media normalization for AIGate media models', () => {
+    const result = getOpenAIConfig(mockApiKey, {
+      reverseProxyUrl: 'https://api.aigate.shop/v1',
+      modelOptions: { model: 'google/gemini-omni-flash-preview' },
+    });
+
+    expect(result.configOptions?.fetch).toEqual(expect.any(Function));
+    expect(result.llmConfig.streaming).toBe(false);
+  });
+
   it('should handle Azure configuration', () => {
     const azure = {
       azureOpenAIApiInstanceName: 'test-instance',

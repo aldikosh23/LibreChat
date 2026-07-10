@@ -158,6 +158,7 @@ const AttachFileMenu = ({
       if (currentProvider?.toLowerCase() === Providers.OPENROUTER) {
         currentProvider = Providers.OPENROUTER;
       }
+      const isAigate = currentProvider?.toLowerCase() === 'aigate';
 
       const isAzureWithResponsesApi =
         (currentProvider === EModelEndpoint.azureOpenAI ||
@@ -167,14 +168,19 @@ const AttachFileMenu = ({
       if (
         isDocumentSupportedProvider(endpointType) ||
         isDocumentSupportedProvider(currentProvider) ||
-        isAzureWithResponsesApi
+        isAzureWithResponsesApi ||
+        isAigate
       ) {
         items.push({
           label: localize('com_ui_upload_provider'),
           onClick: () => {
             setToolResource(undefined);
             let fileType: Exclude<FileUploadType, 'image' | 'document'> = 'image_document';
-            if (currentProvider === Providers.GOOGLE || currentProvider === Providers.OPENROUTER) {
+            if (
+              currentProvider === Providers.GOOGLE ||
+              currentProvider === Providers.OPENROUTER ||
+              isAigate
+            ) {
               fileType = 'image_document_video_audio';
             } else if (
               currentProvider === Providers.BEDROCK ||

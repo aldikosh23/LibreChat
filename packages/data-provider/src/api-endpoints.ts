@@ -44,6 +44,8 @@ export const health = () => `${BASE_URL}/health`;
 export const user = () => `${BASE_URL}/api/user`;
 
 export const balance = () => `${BASE_URL}/api/balance`;
+export const aigateBalance = (endpoint: string) =>
+  `${BASE_URL}/api/aigate/balance?endpoint=${encodeURIComponent(endpoint)}`;
 
 export const userPlugins = () => `${BASE_URL}/api/user/plugins`;
 
