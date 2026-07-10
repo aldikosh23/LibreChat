@@ -9,6 +9,7 @@ const DEFAULT_BALANCE_URL = 'https://api.aigate.shop/v1/balance';
 const DEFAULT_CLAIM_URL = 'http://localhost:3000/api/chat/sso/claim';
 const DEFAULT_API_BASE_URL = 'https://api.aigate.shop/v1';
 const DEFAULT_ENDPOINT = 'AIGate';
+const DEFAULT_SSO_AFTER_LOGIN = '/login?redirect_to=%2Fc%2Fnew';
 const AIGATE_ISSUER = 'aigate';
 const SSO_CLAIM_TIMEOUT_MS = 5000;
 const MAX_SSO_TOKEN_LENGTH = 16 * 1024;
@@ -150,7 +151,7 @@ async function handleSso(req, res) {
     });
 
     await setAuthTokens(user._id, res, null, req);
-    return res.redirect(303, process.env.AIGATE_SSO_AFTER_LOGIN || '/');
+    return res.redirect(303, process.env.AIGATE_SSO_AFTER_LOGIN || DEFAULT_SSO_AFTER_LOGIN);
   } catch {
     return res.status(502).send('AIGate SSO failed');
   }

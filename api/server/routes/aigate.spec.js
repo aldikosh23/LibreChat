@@ -79,7 +79,7 @@ describe('AIGate routes', () => {
       .send({ token: 'encrypted-one-time-claim' });
 
     expect(response.status).toBe(303);
-    expect(response.headers.location).toBe('/');
+    expect(response.headers.location).toBe('/login?redirect_to=%2Fc%2Fnew');
     expect(response.headers['cache-control']).toBe('private, no-store');
     expect(response.headers['referrer-policy']).toBe('no-referrer');
     expect(timeoutSpy).toHaveBeenCalledWith(5000);
@@ -123,7 +123,7 @@ describe('AIGate routes', () => {
     const response = await request(app).get('/api/aigate/sso?token=encrypted-one-time-claim');
 
     expect(response.status).toBe(303);
-    expect(response.headers.location).toBe('/');
+    expect(response.headers.location).toBe('/login?redirect_to=%2Fc%2Fnew');
     expect(response.headers['cache-control']).toBe('private, no-store');
     expect(response.headers['referrer-policy']).toBe('no-referrer');
     expect(global.fetch).toHaveBeenCalledWith(
