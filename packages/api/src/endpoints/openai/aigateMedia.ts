@@ -20,24 +20,41 @@ function mediaUrl(item: unknown, kind: 'image' | 'video'): string | null {
   return null;
 }
 
+function mediaMarker(kind: 'image' | 'video', url: string): string {
+  return `[[AIGATE_MEDIA:${kind}:${Buffer.from(url).toString('base64url')}]]`;
+}
+
 function normalizeMessage(value: unknown): void {
   const message = asRecord(value);
   if (!message) return;
-  const parts: JsonRecord[] = [];
-  if (Array.isArray(message.content)) {
-    parts.push(...(message.content.filter((part) => asRecord(part)) as JsonRecord[]));
-  } else if (typeof message.content === 'string' && message.content) {
-    parts.push({ type: 'text', text: message.content });
-  }
+  const markers: string[] = [];
   for (const item of Array.isArray(message.images) ? message.images : []) {
     const url = mediaUrl(item, 'image');
-    if (url) parts.push({ type: 'image_url', image_url: { url } });
+    if (url) markers.push(mediaMarker('image', url));
   }
   for (const item of Array.isArray(message.videos) ? message.videos : []) {
     const url = mediaUrl(item, 'video');
-    if (url) parts.push({ type: 'video_url', video_url: { url } });
+    if (url) markers.push(mediaMarker('video', url));
   }
-  if (parts.length > 0) message.content = parts;
+
+  // Keep ordinary text responses byte-for-byte unchanged. LangChain's OpenAI
+  // streaming parser only supports string content and drops array content.
+  if (markers.length === 0) {
+    return;
+  }
+
+  let text = '';
+  if (typeof message.content === 'string') {
+    text = message.content;
+  } else if (Array.isArray(message.content)) {
+    text = message.content
+      .map((part) => asRecord(part))
+      .filter((part): part is JsonRecord => part?.type === 'text' && typeof part.text === 'string')
+      .map((part) => part.text)
+      .join('');
+  }
+
+  message.content = [text, ...markers].filter(Boolean).join('\n\n');
   delete message.images;
   delete message.videos;
 }

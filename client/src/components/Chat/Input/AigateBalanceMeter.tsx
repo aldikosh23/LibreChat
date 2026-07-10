@@ -45,6 +45,23 @@ export default function AigateBalanceMeter({
     }
   }, [endpoint]);
 
+  const refreshAfterSubmit = useCallback(
+    async (before: AigateBalanceSnapshot | null) => {
+      for (const delay of [0, 1000, 2500, 5000]) {
+        if (delay > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, delay));
+        }
+        const after = await loadBalance();
+        const cost = getAigateUsageCostDelta(before, after);
+        if (cost) {
+          return cost;
+        }
+      }
+      return null;
+    },
+    [loadBalance],
+  );
+
   useEffect(() => {
     void loadBalance();
     const interval = window.setInterval(() => void loadBalance(), 30000);
@@ -68,8 +85,7 @@ export default function AigateBalanceMeter({
     if (!isSubmitting && wasSubmitting) {
       const before = beforeSubmitRef.current;
       beforeSubmitRef.current = null;
-      void loadBalance().then((after) => {
-        const cost = getAigateUsageCostDelta(before, after);
+      void refreshAfterSubmit(before).then((cost) => {
         if (
           !cost ||
           !conversationId ||
@@ -82,7 +98,7 @@ export default function AigateBalanceMeter({
         setAigateStoredMessageCost(conversationId, latestMessageId, cost);
       });
     }
-  }, [balance, conversationId, isSubmitting, latestMessageId, loadBalance]);
+  }, [balance, conversationId, isSubmitting, latestMessageId, loadBalance, refreshAfterSubmit]);
 
   if (!balance) {
     return null;

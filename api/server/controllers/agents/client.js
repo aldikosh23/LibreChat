@@ -104,6 +104,7 @@ const {
   isAigateImageModel,
   parseAigateImageResponse,
 } = require('~/server/services/aigateImage');
+const { expandAigateMediaMarkers } = require('~/server/services/aigateMedia');
 const db = require('~/models');
 
 const loadAgent = (params) => loadAgentFn(params, { getAgent: db.getAgent, getMCPServerTools });
@@ -947,6 +948,7 @@ class AgentClient extends BaseClient {
       abortController: opts.abortController,
     });
 
+    this.contentParts = expandAigateMediaMarkers(this.contentParts);
     const completion = filterMalformedContentParts(this.contentParts);
     const metadata = this.buildResponseMetadata();
     return metadata ? { completion, metadata } : { completion };
