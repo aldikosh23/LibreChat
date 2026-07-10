@@ -1070,7 +1070,8 @@ class AgentClient extends BaseClient {
       throw new Error('Image prompt is empty');
     }
 
-    const plannerModel = process.env.AIGATE_IMAGE_PLANNER_MODEL || 'deepseek/deepseek-v4-pro';
+    const plannerModel = process.env.AIGATE_IMAGE_PLANNER_MODEL || 'deepseek/deepseek-v4-flash';
+    const plannerApiKey = process.env.AIGATE_IMAGE_PLANNER_API_KEY;
     let plan = inferAigateImagePlan(
       prompt,
       currentImageUrls.length > 0,
@@ -1078,13 +1079,16 @@ class AgentClient extends BaseClient {
     );
 
     try {
+      if (!plannerApiKey) {
+        throw new Error('AIGate image planner key is not configured');
+      }
       const plannerResponse = await fetch(
         new URL('chat/completions', `${String(baseURL).replace(/\/+$/, '')}/`),
         {
           method: 'POST',
           signal,
           headers: {
-            authorization: `Bearer ${apiKey}`,
+            authorization: `Bearer ${plannerApiKey}`,
             'content-type': 'application/json',
           },
           body: JSON.stringify({
@@ -1119,19 +1123,6 @@ class AgentClient extends BaseClient {
       plan = parseAigateImagePlan(plannerPayload?.choices?.[0]?.message?.content);
       if (currentImageUrls.length > 0) plan.action = 'edit';
       if (currentImageUrls.length === 0 && previousImageUrls.length === 0) plan.action = 'generate';
-
-      const plannerUsage = plannerPayload?.usage;
-      if (plannerUsage?.cost_usd != null && this.usageEmitSink) {
-        this.usageEmitSink.push({
-          input_tokens: plannerUsage.prompt_tokens ?? 0,
-          output_tokens: plannerUsage.completion_tokens ?? 0,
-          total_tokens: plannerUsage.total_tokens ?? 0,
-          cost: plannerUsage.cost_usd,
-          model: plannerModel,
-          provider: 'AIGate',
-          runId: this.responseMessageId,
-        });
-      }
     } catch (error) {
       logger.warn('[AIGate image planner] Falling back to local routing', error);
     }

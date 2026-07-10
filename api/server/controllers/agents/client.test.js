@@ -76,9 +76,19 @@ describe('AgentClient - applyHideSequentialOutputsFilter', () => {
 
 describe('AgentClient - AIGate image endpoints', () => {
   const originalFetch = global.fetch;
+  const originalPlannerApiKey = process.env.AIGATE_IMAGE_PLANNER_API_KEY;
+
+  beforeEach(() => {
+    process.env.AIGATE_IMAGE_PLANNER_API_KEY = 'sk-admin';
+  });
 
   afterEach(() => {
     global.fetch = originalFetch;
+    if (originalPlannerApiKey == null) {
+      delete process.env.AIGATE_IMAGE_PLANNER_API_KEY;
+    } else {
+      process.env.AIGATE_IMAGE_PLANNER_API_KEY = originalPlannerApiKey;
+    }
   });
 
   it('returns generated images as message content and records upstream cost', async () => {
@@ -140,8 +150,12 @@ describe('AgentClient - AIGate image endpoints', () => {
     expect(global.fetch).toHaveBeenNthCalledWith(
       1,
       new URL('https://api.aigate.shop/v1/chat/completions'),
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ authorization: 'Bearer sk-admin' }),
+      }),
     );
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body).model).toBe('deepseek/deepseek-v4-flash');
     expect(global.fetch).toHaveBeenNthCalledWith(
       2,
       new URL('https://api.aigate.shop/v1/images/generations'),
@@ -162,11 +176,6 @@ describe('AgentClient - AIGate image endpoints', () => {
       },
     ]);
     expect(context.usageEmitSink).toEqual([
-      expect.objectContaining({
-        cost: 0.001,
-        model: 'deepseek/deepseek-v4-pro',
-        runId: 'message-1',
-      }),
       expect.objectContaining({ cost: 0.05, model: 'openai/gpt-image-2', runId: 'message-1' }),
     ]);
   });
