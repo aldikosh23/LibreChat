@@ -41,7 +41,8 @@ services:
       start_period: 60s
 
   mongodb:
-    image: mongo:8.0.26@sha256:ffa440e8d62533e24a67696ae1bbb46e610ebb3167d65abd122b496ae06d28e6
+    # MongoDB 8.0.26 refuses to start on the OVH Linux 7.x kernel (SERVER-121912).
+    image: mongo:8.0.20@sha256:098862b1339f031900ca66cf8fef799e616d6324fa41b9a263f2ec899552c1ef
     container_name: librechat-aigate-mongodb
     restart: unless-stopped
     volumes:
