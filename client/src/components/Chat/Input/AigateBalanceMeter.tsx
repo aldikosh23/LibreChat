@@ -27,6 +27,11 @@ export default function AigateBalanceMeter({
   const beforeSubmitRef = useRef<AigateBalanceSnapshot | null>(null);
   const wasSubmittingRef = useRef(false);
   const savedMessageRef = useRef<string | null>(null);
+  const latestMessageIdRef = useRef(latestMessageId);
+
+  useEffect(() => {
+    latestMessageIdRef.current = latestMessageId;
+  }, [latestMessageId]);
 
   const loadBalance = useCallback(async () => {
     if (!endpoint) {
@@ -86,16 +91,17 @@ export default function AigateBalanceMeter({
       const before = beforeSubmitRef.current;
       beforeSubmitRef.current = null;
       void refreshAfterSubmit(before).then((cost) => {
+        const responseMessageId = latestMessageIdRef.current;
         if (
           !cost ||
           !conversationId ||
-          !latestMessageId ||
-          savedMessageRef.current === latestMessageId
+          !responseMessageId ||
+          savedMessageRef.current === responseMessageId
         ) {
           return;
         }
-        savedMessageRef.current = latestMessageId;
-        setAigateStoredMessageCost(conversationId, latestMessageId, cost);
+        savedMessageRef.current = responseMessageId;
+        setAigateStoredMessageCost(conversationId, responseMessageId, cost);
       });
     }
   }, [balance, conversationId, isSubmitting, latestMessageId, loadBalance, refreshAfterSubmit]);

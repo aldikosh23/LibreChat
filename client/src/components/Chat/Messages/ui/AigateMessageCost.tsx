@@ -48,10 +48,10 @@ export default function AigateMessageCost({ message, conversationId }: Props) {
 
   return (
     <span
-      className="inline-flex items-center rounded-full border border-border-light bg-surface-tertiary px-2 py-0.5 font-mono text-[11px] text-text-secondary"
-      title="AIGate message cost"
+      className="inline-flex items-center font-mono text-[11px] text-text-tertiary"
+      title="Request cost"
     >
-      {formatAigateUsd(cost)}
+      -{formatAigateUsd(cost)}
     </span>
   );
 }

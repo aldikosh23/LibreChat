@@ -82,15 +82,42 @@ describe('AgentClient - AIGate image endpoints', () => {
   });
 
   it('returns generated images as message content and records upstream cost', async () => {
-    global.fetch = jest.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          data: [{ b64_json: 'abc' }],
-          usage: { prompt_tokens: 12, completion_tokens: 34, total_tokens: 46, cost_usd: 0.05 },
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      ),
-    );
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    action: 'generate',
+                    aspect_ratio: '21:9',
+                    image_size: '4K',
+                    quality: 'high',
+                  }),
+                },
+              },
+            ],
+            usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30, cost_usd: 0.001 },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [{ b64_json: 'abc' }],
+            usage: {
+              prompt_tokens: 12,
+              completion_tokens: 34,
+              total_tokens: 46,
+              cost_usd: 0.05,
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
     const context = {
       model: 'openai/gpt-image-2',
       responseMessageId: 'message-1',
@@ -106,15 +133,26 @@ describe('AgentClient - AIGate image endpoints', () => {
         },
       },
     };
-    const messages = [{ _getType: () => 'human', content: 'draw a cat' }];
+    const messages = [{ _getType: () => 'human', content: 'draw a cat in 4K, 21:9' }];
 
     await AgentClient.prototype.runAigateImageRequest.call(context, messages, undefined);
 
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      1,
+      new URL('https://api.aigate.shop/v1/chat/completions'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
       new URL('https://api.aigate.shop/v1/images/generations'),
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ model: 'openai/gpt-image-2', prompt: 'draw a cat' }),
+        body: JSON.stringify({
+          model: 'openai/gpt-image-2',
+          prompt: 'draw a cat in 4K, 21:9',
+          quality: 'high',
+          image_config: { aspect_ratio: '21:9', image_size: '4K' },
+        }),
       }),
     );
     expect(context.contentParts).toEqual([
@@ -124,6 +162,11 @@ describe('AgentClient - AIGate image endpoints', () => {
       },
     ]);
     expect(context.usageEmitSink).toEqual([
+      expect.objectContaining({
+        cost: 0.001,
+        model: 'deepseek/deepseek-v4-pro',
+        runId: 'message-1',
+      }),
       expect.objectContaining({ cost: 0.05, model: 'openai/gpt-image-2', runId: 'message-1' }),
     ]);
   });

@@ -101,7 +101,9 @@ const { getMCPManager } = require('~/config');
 const {
   buildAigateImageRequest,
   extractAigateImageInput,
+  inferAigateImagePlan,
   isAigateImageModel,
+  parseAigateImagePlan,
   parseAigateImageResponse,
 } = require('~/server/services/aigateImage');
 const { expandAigateMediaMarkers } = require('~/server/services/aigateMedia');
@@ -1063,12 +1065,84 @@ class AgentClient extends BaseClient {
       throw new Error('AIGate image endpoint is not configured');
     }
 
-    const { prompt, imageUrls } = extractAigateImageInput(messages);
+    const { prompt, currentImageUrls, previousImageUrls } = extractAigateImageInput(messages);
     if (!prompt) {
       throw new Error('Image prompt is empty');
     }
 
-    const request = buildAigateImageRequest({ model, prompt, imageUrls });
+    const plannerModel = process.env.AIGATE_IMAGE_PLANNER_MODEL || 'deepseek/deepseek-v4-pro';
+    let plan = inferAigateImagePlan(
+      prompt,
+      currentImageUrls.length > 0,
+      previousImageUrls.length > 0,
+    );
+
+    try {
+      const plannerResponse = await fetch(
+        new URL('chat/completions', `${String(baseURL).replace(/\/+$/, '')}/`),
+        {
+          method: 'POST',
+          signal,
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: plannerModel,
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'Route an image request. Return JSON only with action (generate or edit), aspect_ratio (1:1, 16:9, 9:16, 21:9, 4:3, 3:4, 4:5, 5:4, or null), image_size (1K, 2K, 4K, or null), and quality (auto, low, medium, high, or null). Choose edit for an attached image, or when the user clearly refers to changing the previous image. Choose generate for a new image. Preserve the user intent; do not invent settings.',
+              },
+              {
+                role: 'user',
+                content: JSON.stringify({
+                  prompt,
+                  current_image_count: currentImageUrls.length,
+                  previous_image_count: previousImageUrls.length,
+                }),
+              },
+            ],
+            temperature: 0,
+            max_tokens: 700,
+          }),
+        },
+      );
+      const plannerPayload = await plannerResponse.json().catch(() => null);
+      if (!plannerResponse.ok) {
+        throw new Error(
+          plannerPayload?.error?.message || `planner failed (${plannerResponse.status})`,
+        );
+      }
+
+      plan = parseAigateImagePlan(plannerPayload?.choices?.[0]?.message?.content);
+      if (currentImageUrls.length > 0) plan.action = 'edit';
+      if (currentImageUrls.length === 0 && previousImageUrls.length === 0) plan.action = 'generate';
+
+      const plannerUsage = plannerPayload?.usage;
+      if (plannerUsage?.cost_usd != null && this.usageEmitSink) {
+        this.usageEmitSink.push({
+          input_tokens: plannerUsage.prompt_tokens ?? 0,
+          output_tokens: plannerUsage.completion_tokens ?? 0,
+          total_tokens: plannerUsage.total_tokens ?? 0,
+          cost: plannerUsage.cost_usd,
+          model: plannerModel,
+          provider: 'AIGate',
+          runId: this.responseMessageId,
+        });
+      }
+    } catch (error) {
+      logger.warn('[AIGate image planner] Falling back to local routing', error);
+    }
+
+    const request = buildAigateImageRequest({
+      model,
+      prompt,
+      currentImageUrls,
+      previousImageUrls,
+      plan,
+    });
     const url = new URL(request.path, `${String(baseURL).replace(/\/+$/, '')}/`);
     const upstream = await fetch(url, {
       method: 'POST',
