@@ -51,6 +51,10 @@ RUN \
 
 COPY --chown=node:node . .
 
+# The dependency patches are copied after the cached npm ci layer, so apply them
+# explicitly before building and pruning development dependencies.
+RUN npx patch-package
+
 RUN \
     # React client build with configurable memory
     NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run frontend; \
