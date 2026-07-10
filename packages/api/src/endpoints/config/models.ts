@@ -4,6 +4,7 @@ import {
   ErrorTypes,
   EModelEndpoint,
   extractEnvVariable,
+  getServerManagedKeyName,
   normalizeEndpointName,
 } from 'librechat-data-provider';
 import type { TModelsConfig, TEndpoint } from 'librechat-data-provider';
@@ -16,7 +17,7 @@ import { getTokenConfigKey } from '~/endpoints/custom/initialize';
 import { getAppConfigOptionsFromUser } from '~/app/service';
 import { validateEndpointURL } from '~/auth';
 import { tokenConfigCache } from '~/cache';
-import { isUserProvided } from '~/utils';
+import { isUserProvided, isServerManaged } from '~/utils';
 
 /**
  * Stable fingerprint of a headers object, used to disambiguate the
@@ -41,6 +42,7 @@ interface ResolvedEndpoint {
   apiKey: string;
   baseURL: string;
   apiKeyIsUserProvided: boolean;
+  apiKeyIsServerManaged: boolean;
   baseURLIsUserProvided: boolean;
 }
 
@@ -115,13 +117,16 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
         apiKey: resolvedApiKey,
         baseURL: resolvedBaseURL,
         apiKeyIsUserProvided: isUserProvided(resolvedApiKey),
+        apiKeyIsServerManaged: isServerManaged(resolvedApiKey),
         baseURLIsUserProvided: isUserProvided(resolvedBaseURL),
       };
       resolved.push(entry);
 
       if (
         endpoint.models?.fetch &&
-        (entry.apiKeyIsUserProvided || entry.baseURLIsUserProvided) &&
+        (entry.apiKeyIsUserProvided ||
+          entry.apiKeyIsServerManaged ||
+          entry.baseURLIsUserProvided) &&
         req.user?.id
       ) {
         userKeyEndpoints.push(entry);
@@ -132,7 +137,12 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
     if (userKeyEndpoints.length > 0 && req.user?.id) {
       const userId = req.user.id;
       const results = await Promise.allSettled(
-        userKeyEndpoints.map((e) => getUserKeyValues({ userId, name: e.name })),
+        userKeyEndpoints.map((e) =>
+          getUserKeyValues({
+            userId,
+            name: e.apiKeyIsServerManaged ? getServerManagedKeyName(e.name) : e.name,
+          }),
+        ),
       );
       for (let i = 0; i < userKeyEndpoints.length; i++) {
         const settled = results[i];
@@ -163,6 +173,7 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
       apiKey: API_KEY,
       baseURL: BASE_URL,
       apiKeyIsUserProvided,
+      apiKeyIsServerManaged,
       baseURLIsUserProvided,
     } of resolved) {
       const { models, headers: endpointHeaders } = endpoint;
@@ -172,7 +183,12 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
       // fetched model list within the same request.
       const uniqueKey = `${BASE_URL}__${API_KEY}__${headersFingerprint(endpointHeaders)}`;
 
-      if (models?.fetch && !apiKeyIsUserProvided && !baseURLIsUserProvided) {
+      if (
+        models?.fetch &&
+        !apiKeyIsUserProvided &&
+        !apiKeyIsServerManaged &&
+        !baseURLIsUserProvided
+      ) {
         if (!fetchPromisesMap[uniqueKey]) {
           /** User-scoped when configured headers resolve per user — the
            *  derived token config must not be cached under the shared name */
@@ -200,7 +216,9 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
       if (models?.fetch && userKeyMap.has(name)) {
         const userKeyValues = userKeyMap.get(name);
         const resolvedApiKey =
-          apiKeyIsUserProvided || baseURLIsUserProvided ? userKeyValues?.apiKey : API_KEY;
+          apiKeyIsUserProvided || apiKeyIsServerManaged || baseURLIsUserProvided
+            ? userKeyValues?.apiKey
+            : API_KEY;
         const resolvedBaseURL = baseURLIsUserProvided ? userKeyValues?.baseURL : BASE_URL;
 
         if (resolvedApiKey && resolvedBaseURL) {

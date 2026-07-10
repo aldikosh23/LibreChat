@@ -1,4 +1,5 @@
 const express = require('express');
+const { getServerManagedKeyName } = require('librechat-data-provider');
 const { createUser, findUser, getUserKey, updateUserKey } = require('~/models');
 const { requireJwtAuth } = require('~/server/middleware');
 const { setAuthTokens } = require('~/server/services/AuthService');
@@ -9,6 +10,8 @@ const DEFAULT_CLAIM_URL = 'http://localhost:3000/api/chat/sso/claim';
 const DEFAULT_API_BASE_URL = 'https://api.aigate.shop/v1';
 const DEFAULT_ENDPOINT = 'AIGate';
 const AIGATE_ISSUER = 'aigate';
+const SSO_CLAIM_TIMEOUT_MS = 5000;
+const MAX_SSO_TOKEN_LENGTH = 16 * 1024;
 
 function parseStoredUserKey(rawKey) {
   if (typeof rawKey !== 'string') {
@@ -28,11 +31,13 @@ function parseStoredUserKey(rawKey) {
         baseURL: typeof parsed.baseURL === 'string' ? parsed.baseURL.trim() : '',
       };
     }
-  } catch {
-    // Plain API keys are valid.
-  }
+  } catch {}
 
-  return { apiKey: trimmed, baseURL: '' };
+  return null;
+}
+
+function getAigateEndpoint() {
+  return String(process.env.AIGATE_ENDPOINT_NAME || DEFAULT_ENDPOINT).trim() || DEFAULT_ENDPOINT;
 }
 
 function getSsoSecret() {
@@ -66,7 +71,10 @@ async function claimAigateSession(token) {
   const claimUrl = process.env.AIGATE_SSO_CLAIM_URL || DEFAULT_CLAIM_URL;
   const upstream = await fetch(claimUrl, {
     method: 'POST',
+    cache: 'no-store',
+    signal: AbortSignal.timeout(SSO_CLAIM_TIMEOUT_MS),
     headers: {
+      'cache-control': 'no-store',
       'content-type': 'application/json',
       'x-aigate-chat-secret': getSsoSecret(),
     },
@@ -74,7 +82,7 @@ async function claimAigateSession(token) {
   });
   const payload = await upstream.json().catch(() => null);
   if (!upstream.ok || !payload?.success) {
-    throw new Error(payload?.message || 'AIGate SSO claim failed');
+    throw new Error('AIGate SSO claim failed');
   }
   return payload.data;
 }
@@ -108,45 +116,63 @@ async function findOrCreateAigateUser(aigateUser) {
   );
 }
 
-router.get('/sso', async (req, res) => {
-  const token = typeof req.query.token === 'string' ? req.query.token.trim() : '';
-  if (!token) {
-    return res.status(400).send('missing sso token');
+router.use((_req, res, next) => {
+  res.set({
+    'Cache-Control': 'private, no-store',
+    Pragma: 'no-cache',
+    'Referrer-Policy': 'no-referrer',
+  });
+  next();
+});
+
+async function handleSso(req, res) {
+  const rawToken = req.method === 'GET' ? req.query?.token : req.body?.token;
+  const token = typeof rawToken === 'string' ? rawToken.trim() : '';
+  if (!token || token.length > MAX_SSO_TOKEN_LENGTH) {
+    return res.status(400).send('invalid sso token');
   }
 
   try {
     const claim = await claimAigateSession(token);
     const user = await findOrCreateAigateUser(claim.user);
-    const endpoint = String(claim.endpoint || process.env.AIGATE_ENDPOINT_NAME || DEFAULT_ENDPOINT);
+    const endpoint = getAigateEndpoint();
     const apiKey = String(claim.apiKey || '').trim();
     const baseURL = String(claim.baseURL || process.env.AIGATE_API_BASE_URL || DEFAULT_API_BASE_URL).trim();
 
-    if (!apiKey) {
+    if (String(claim.endpoint || '').trim() !== endpoint || !apiKey) {
       throw new Error('AIGate API key is missing');
     }
 
     await updateUserKey({
       userId: user._id.toString(),
-      name: endpoint,
+      name: getServerManagedKeyName(endpoint),
       value: JSON.stringify({ apiKey, baseURL }),
     });
 
     await setAuthTokens(user._id, res, null, req);
-    return res.redirect(302, process.env.AIGATE_SSO_AFTER_LOGIN || '/');
-  } catch (err) {
-    return res.status(502).send(err instanceof Error ? err.message : 'AIGate SSO failed');
+    return res.redirect(303, process.env.AIGATE_SSO_AFTER_LOGIN || '/');
+  } catch {
+    return res.status(502).send('AIGate SSO failed');
   }
-});
+}
+
+router.get('/sso', handleSso);
+router.post('/sso', handleSso);
 
 router.get('/balance', requireJwtAuth, async (req, res) => {
   const endpoint = typeof req.query.endpoint === 'string' ? req.query.endpoint.trim() : '';
-  if (!endpoint) {
-    return res.status(400).send({ error: 'endpoint is required' });
+  if (endpoint !== getAigateEndpoint()) {
+    return res.status(400).send({ error: 'invalid endpoint' });
   }
 
   let apiKey;
   try {
-    const userKey = parseStoredUserKey(await getUserKey({ userId: req.user.id, name: endpoint }));
+    const userKey = parseStoredUserKey(
+      await getUserKey({
+        userId: req.user.id,
+        name: getServerManagedKeyName(endpoint),
+      }),
+    );
     if (!userKey || !userKey.apiKey) {
       return res.status(404).send({ error: 'AIGate key is not configured' });
     }

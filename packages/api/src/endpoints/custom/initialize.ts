@@ -5,6 +5,7 @@ import {
   EModelEndpoint,
   FetchTokenConfig,
   extractEnvVariable,
+  getServerManagedKeyName,
 } from 'librechat-data-provider';
 import type { TEndpoint } from 'librechat-data-provider';
 import type { AppConfig } from '@librechat/data-schemas';
@@ -16,7 +17,7 @@ import type {
 } from '~/types';
 import { getLLMConfig as getAnthropicLLMConfig } from '~/endpoints/anthropic/llm';
 import { extractDefaultParams } from '~/endpoints/openai/llm';
-import { isUserProvided, checkUserKeyExpiry } from '~/utils';
+import { isUserProvided, isServerManaged, checkUserKeyExpiry } from '~/utils';
 import { getOpenAIConfig } from '~/endpoints/openai/config';
 import { getScopedTokenConfigKey } from '~/endpoints/keys';
 import { getCustomEndpointConfig } from '~/app/config';
@@ -51,11 +52,12 @@ export function getTokenConfigKey(
   }
 
   const userProvidesKey = isUserProvided(extractEnvVariable(endpointConfig.apiKey ?? ''));
+  const serverManagesKey = isServerManaged(extractEnvVariable(endpointConfig.apiKey ?? ''));
   const userProvidesURL = isUserProvided(extractEnvVariable(endpointConfig.baseURL ?? ''));
   const willForwardUserScopedHeaders = !!endpointConfig?.headers && !userProvidesURL;
   const tenantScope = getTenantTokenScope(tenantId);
 
-  if (userProvidesKey || userProvidesURL || willForwardUserScopedHeaders) {
+  if (userProvidesKey || serverManagesKey || userProvidesURL || willForwardUserScopedHeaders) {
     return tenantScope
       ? getScopedTokenConfigKey('tenant-user', [tenantScope, endpoint, userId])
       : `${endpoint}:${userId}`;
@@ -203,6 +205,7 @@ export async function initializeCustom({
   }
 
   const userProvidesKey = isUserProvided(CUSTOM_API_KEY);
+  const serverManagesKey = isServerManaged(CUSTOM_API_KEY);
   const userProvidesURL = isUserProvided(CUSTOM_BASE_URL);
 
   // Expiry is only checked when present: the Agents API sends an OpenAI-compatible
@@ -213,14 +216,18 @@ export async function initializeCustom({
   }
 
   let userValues = null;
-  if (userProvidesKey || userProvidesURL) {
-    userValues = await db.getUserKeyValues({ userId: req.user?.id ?? '', name: endpoint });
+  if (userProvidesKey || serverManagesKey || userProvidesURL) {
+    userValues = await db.getUserKeyValues({
+      userId: req.user?.id ?? '',
+      name: serverManagesKey ? getServerManagedKeyName(endpoint) : endpoint,
+    });
   }
 
-  const apiKey = userProvidesKey || userProvidesURL ? userValues?.apiKey : CUSTOM_API_KEY;
+  const apiKey =
+    userProvidesKey || serverManagesKey || userProvidesURL ? userValues?.apiKey : CUSTOM_API_KEY;
   const baseURL = userProvidesURL ? userValues?.baseURL : CUSTOM_BASE_URL;
 
-  if ((userProvidesKey || userProvidesURL) && !apiKey) {
+  if ((userProvidesKey || serverManagesKey || userProvidesURL) && !apiKey) {
     throw new Error(
       JSON.stringify({
         type: ErrorTypes.NO_USER_KEY,

@@ -9,6 +9,7 @@ export const isUUID = z.string().uuid();
 
 export enum AuthType {
   OVERRIDE_AUTH = 'override_auth',
+  SERVER_MANAGED = 'server_managed',
   USER_PROVIDED = 'user_provided',
   SYSTEM_DEFINED = 'system_defined',
 }

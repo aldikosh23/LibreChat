@@ -12,6 +12,7 @@ jest.mock('~/utils', () => {
     ...original,
     // Inline literal — jest.mock() factory may not reference imports.
     isUserProvided: (val: string) => val === 'user_provided',
+    isServerManaged: (val: string) => val === 'server_managed',
   };
 });
 
@@ -178,6 +179,39 @@ describe('createLoadConfigModels – user-provided baseURL header guard', () => 
         baseURLIsUserProvided: false,
         headers,
       }),
+    );
+  });
+
+  it('fetches models with only the internal server-managed user key', async () => {
+    const getUserKeyValues = jest.fn().mockResolvedValue({ apiKey: 'sk-claimed' });
+    const loadConfigModels = createLoadConfigModels({
+      getAppConfig: jest.fn().mockResolvedValue(
+        buildAppConfig({
+          baseURL: 'https://api.aigate.shop/v1',
+          apiKey: 'server_managed',
+        }),
+      ),
+      getUserKeyValues,
+      fetchModels,
+    });
+
+    await loadConfigModels({
+      user: { id: 'user-1' },
+      config: undefined,
+    } as unknown as ServerRequest);
+
+    expect(getUserKeyValues).toHaveBeenCalledWith({
+      userId: 'user-1',
+      name: '__server_managed__:TestProxy',
+    });
+    expect(fetchModels).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'TestProxy',
+        apiKey: 'sk-claimed',
+      }),
+    );
+    expect(fetchModels).not.toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: 'server_managed' }),
     );
   });
 

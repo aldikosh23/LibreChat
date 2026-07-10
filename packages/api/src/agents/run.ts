@@ -50,7 +50,7 @@ import { buildHITLRunWiring } from '~/agents/hitl/runtime';
 import { buildLangfuseConfig } from '~/langfuse/config';
 import { resolveConfigHeaders } from '~/utils/headers';
 import { applyTestRunHook } from '~/agents/testHook';
-import { isUserProvided } from '~/utils/common';
+import { isUserProvided, isServerManaged } from '~/utils/common';
 
 /** Expected shape of JSON tool search results */
 interface ToolSearchJsonResult {
@@ -461,7 +461,7 @@ function resolveSummarizationProvider(
      * Callers wanting user-provided summarization against a non-agent
      * endpoint must hit the same endpoint as the agent (handled upstream).
      */
-    if (isUserProvided(rawApiKey) || isUserProvided(rawBaseURL)) {
+    if (isUserProvided(rawApiKey) || isServerManaged(rawApiKey) || isUserProvided(rawBaseURL)) {
       return { provider: rawProvider };
     }
     const apiKey = extractEnvVariable(rawApiKey);

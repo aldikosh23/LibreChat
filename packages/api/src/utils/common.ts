@@ -35,6 +35,8 @@ export function isEnabled(value?: string | boolean | null | undefined): boolean 
  */
 export const isUserProvided = (value?: string): boolean => value === AuthType.USER_PROVIDED;
 
+export const isServerManaged = (value?: string): boolean => value === AuthType.SERVER_MANAGED;
+
 /**
  * @param values
  */

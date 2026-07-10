@@ -25,10 +25,18 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
 
-      - name: Trust production host
+      - name: Configure pinned production host key
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p "${{ secrets.DEPLOY_PORT || 22 }}" "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          if [ "$DEPLOY_PORT" = 22 ]; then host_lookup="$DEPLOY_HOST"; else host_lookup="[$DEPLOY_HOST]:$DEPLOY_PORT"; fi
+          ssh-keygen -F "$host_lookup" -f ~/.ssh/known_hosts >/dev/null
 
       - name: Deploy over SSH
         env:
@@ -40,7 +48,7 @@ jobs:
           DEPLOY_SHA: ${{ github.sha }}
           LIBRECHAT_PUBLIC_URL: https://chat.aigate.shop
         run: |
-          ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
             "DEPLOY_REPO='$DEPLOY_REPO' DEPLOY_BRANCH='$DEPLOY_BRANCH' DEPLOY_SHA='$DEPLOY_SHA' LIBRECHAT_PUBLIC_URL='$LIBRECHAT_PUBLIC_URL' bash -s" \
             < ops/deploy-aigate-production.sh
 

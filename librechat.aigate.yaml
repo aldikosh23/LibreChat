@@ -9,7 +9,7 @@ interface:
 endpoints:
   custom:
     - name: "AIGate"
-      apiKey: "user_provided"
+      apiKey: "server_managed"
       baseURL: "${AIGATE_API_BASE_URL}"
       models:
         default:

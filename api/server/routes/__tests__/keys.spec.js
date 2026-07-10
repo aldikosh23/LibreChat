@@ -117,6 +117,16 @@ describe('Keys Routes', () => {
       expect(response.status).toBe(400);
       expect(updateUserKey).not.toHaveBeenCalled();
     });
+
+    it('should reject writes to server-managed keys', async () => {
+      const response = await request(app).put('/api/keys').send({
+        name: '__server_managed__:AIGate',
+        value: JSON.stringify({ apiKey: 'sk-attacker-key' }),
+      });
+
+      expect(response.status).toBe(403);
+      expect(updateUserKey).not.toHaveBeenCalled();
+    });
   });
 
   describe('DELETE /:name', () => {
@@ -132,19 +142,21 @@ describe('Keys Routes', () => {
       });
       expect(deleteUserKey).toHaveBeenCalledTimes(1);
     });
+
+    it('should reject deletion of server-managed keys', async () => {
+      const response = await request(app).delete('/api/keys/__server_managed__%3AAIGate');
+
+      expect(response.status).toBe(403);
+      expect(deleteUserKey).not.toHaveBeenCalled();
+    });
   });
 
   describe('DELETE /', () => {
-    it('should delete all keys when all=true', async () => {
-      deleteUserKey.mockResolvedValue({});
-
+    it('should reject bulk deletion so server-managed keys survive', async () => {
       const response = await request(app).delete('/api/keys?all=true');
 
-      expect(response.status).toBe(204);
-      expect(deleteUserKey).toHaveBeenCalledWith({
-        userId: 'test-user-123',
-        all: true,
-      });
+      expect(response.status).toBe(403);
+      expect(deleteUserKey).not.toHaveBeenCalled();
     });
 
     it('should return 400 when all query param is not true', async () => {

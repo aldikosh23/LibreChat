@@ -1,4 +1,13 @@
 export const envVarRegex = /^\${(.+)}$/;
+const SERVER_MANAGED_KEY_PREFIX = '__server_managed__:';
+
+export function getServerManagedKeyName(name: string): string {
+  return `${SERVER_MANAGED_KEY_PREFIX}${name}`;
+}
+
+export function isServerManagedKeyName(name?: string | null): boolean {
+  return typeof name === 'string' && name.startsWith(SERVER_MANAGED_KEY_PREFIX);
+}
 
 /**
  * Infrastructure env vars that must never be resolved via placeholder expansion.

@@ -3,12 +3,14 @@ name: librechat-aigate
 services:
   api:
     image: ${LIBRECHAT_IMAGE}
+    pull_policy: never
     container_name: librechat-aigate
     restart: unless-stopped
     depends_on:
-      - mongodb
-      - meilisearch
-      - rag_api
+      mongodb:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
     ports:
       - "127.0.0.1:${LIBRECHAT_PORT:-3080}:3080"
     extra_hosts:
@@ -20,8 +22,7 @@ services:
       NODE_ENV: production
       MONGO_URI: mongodb://mongodb:27017/LibreChat
       MEILI_HOST: http://meilisearch:7700
-      RAG_PORT: ${RAG_PORT:-8000}
-      RAG_API_URL: http://rag_api:${RAG_PORT:-8000}
+      RAG_API_URL: ${RAG_API_URL:-}
       NO_PROXY: localhost,127.0.0.1,::1,mongodb,meilisearch,rag_api,vectordb,host.docker.internal
     volumes:
       - ./librechat.yaml:/app/librechat.yaml:ro
@@ -29,46 +30,85 @@ services:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
       - ./skill:/app/skill
+    mem_limit: 3g
+    cpus: 2.0
+    pids_limit: 512
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   mongodb:
-    image: mongo:8.0.20
+    image: mongo:8.0.26@sha256:ffa440e8d62533e24a67696ae1bbb46e610ebb3167d65abd122b496ae06d28e6
     container_name: librechat-aigate-mongodb
     restart: unless-stopped
     volumes:
       - mongodb_data:/data/db
     command: mongod --noauth
+    mem_limit: 3g
+    cpus: 1.5
+    pids_limit: 512
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand({ ping: 1 }).ok ? 0 : 2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   meilisearch:
-    image: getmeili/meilisearch:v1.35.1
+    image: getmeili/meilisearch:v1.35.1@sha256:8b57fc3c7f46535ddef3828df1538465ac19d892eb57c9a10da6df0880bd5856
     container_name: librechat-aigate-meilisearch
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       MEILI_NO_ANALYTICS: "true"
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
     volumes:
       - meili_data:/meili_data
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7700/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   vectordb:
-    image: pgvector/pgvector:0.8.0-pg15-trixie
+    image: pgvector/pgvector:0.8.0-pg15-trixie@sha256:8809cfffff0082cf260c9ac752f1dd1afc77f6f0a55c4e6411321e78efc3d9a5
     container_name: librechat-aigate-vectordb
     restart: unless-stopped
+    profiles: ["rag"]
     environment:
       POSTGRES_DB: librechat
       POSTGRES_USER: librechat
       POSTGRES_PASSWORD: ${RAG_POSTGRES_PASSWORD}
     volumes:
       - pgvector_data:/var/lib/postgresql/data
+    mem_limit: 2g
+    cpus: 1.0
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U librechat -d librechat"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   rag_api:
-    image: registry.librechat.ai/danny-avila/librechat-rag-api-dev-lite:latest
+    image: registry.librechat.ai/danny-avila/librechat-rag-api-dev-lite@sha256:c0ad82657b556c1e16dcfca85d045788f67caa223e25e70eb687f4d16b41dedc
     container_name: librechat-aigate-rag-api
     restart: unless-stopped
+    profiles: ["rag"]
     depends_on:
-      - vectordb
-    env_file:
-      - .env
+      vectordb:
+        condition: service_healthy
     environment:
       DB_HOST: vectordb
       DB_PORT: 5432
@@ -76,6 +116,18 @@ services:
       DB_USER: librechat
       DB_PASSWORD: ${RAG_POSTGRES_PASSWORD}
       RAG_PORT: ${RAG_PORT:-8000}
+      OPENAI_API_KEY: ${RAG_OPENAI_API_KEY:-}
+    mem_limit: 3g
+    cpus: 2.0
+    pids_limit: 512
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.getenv('RAG_PORT', '8000') + '/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
 volumes:
   mongodb_data:

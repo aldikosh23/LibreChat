@@ -33,6 +33,7 @@ jest.mock('~/cache', () => ({
 
 jest.mock('~/utils', () => ({
   isUserProvided: (val: string) => val === 'user_provided',
+  isServerManaged: (val: string) => val === 'server_managed',
   checkUserKeyExpiry: jest.fn(),
 }));
 
@@ -104,6 +105,31 @@ describe('initializeCustom – Agents API user key resolution', () => {
     expect(checkUserKeyExpiry).not.toHaveBeenCalled();
     expect(mockGetOpenAIConfig).toHaveBeenCalledWith(
       'sk-user-key',
+      expect.any(Object),
+      'test-custom',
+    );
+  });
+
+  it('uses only the internal server-managed key slot', async () => {
+    const params = createParams({
+      apiKey: 'server_managed',
+      baseURL: 'https://api.aigate.shop/v1',
+      userApiKey: 'sk-claimed',
+    });
+
+    await initializeCustom(params);
+
+    expect(params.db.getUserKeyValues).toHaveBeenCalledWith({
+      userId: 'user-1',
+      name: '__server_managed__:test-custom',
+    });
+    expect(mockGetOpenAIConfig).toHaveBeenCalledWith(
+      'sk-claimed',
+      expect.any(Object),
+      'test-custom',
+    );
+    expect(mockGetOpenAIConfig).not.toHaveBeenCalledWith(
+      'server_managed',
       expect.any(Object),
       'test-custom',
     );
@@ -555,6 +581,16 @@ describe('getTokenConfigKey – tenant fallback', () => {
         'openrouter:user-1',
       );
     }
+  });
+
+  it('user-scopes server-managed token config', () => {
+    expect(
+      getTokenConfigKey(
+        { ...endpointConfig, apiKey: 'server_managed' },
+        'AIGate',
+        'user-1',
+      ),
+    ).toBe('AIGate:user-1');
   });
 
   it('adds tenant scope only when tenant context is non-empty', () => {
