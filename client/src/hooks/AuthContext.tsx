@@ -50,6 +50,7 @@ const AuthContextProvider = ({
   const [token, setToken] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthResolved, setIsAuthResolved] = useState<boolean>(false);
   const setQueriesEnabled = useSetRecoilState<boolean>(store.queriesEnabled);
 
   const userRoleName = user?.role ?? '';
@@ -75,6 +76,7 @@ const AuthContextProvider = ({
         setToken(token);
         setTokenHeader(token);
         setIsAuthenticated(isAuthenticated);
+        setIsAuthResolved(true);
         if (isAuthenticated) {
           setQueriesEnabled(true);
         }
@@ -174,6 +176,7 @@ const AuthContextProvider = ({
   const silentRefresh = useCallback(() => {
     if (authConfig?.test === true) {
       console.log('Test mode. Skipping silent refresh.');
+      setIsAuthResolved(true);
       return;
     }
     if (isExternalRedirectRef.current) {
@@ -202,6 +205,7 @@ const AuthContextProvider = ({
           return;
         }
         console.log('Token is not present. User is not authenticated.');
+        setIsAuthResolved(true);
         if (authConfig?.test === true) {
           return;
         }
@@ -212,6 +216,7 @@ const AuthContextProvider = ({
           return;
         }
         console.log('refreshToken mutation error:', error);
+        setIsAuthResolved(true);
         if (authConfig?.test === true) {
           return;
         }
@@ -281,12 +286,14 @@ const AuthContextProvider = ({
         ...(isCustomRole && customRole ? { [userRoleName]: customRole } : {}),
       },
       isAuthenticated,
+      isAuthResolved,
     }),
 
     [
       user,
       error,
       isAuthenticated,
+      isAuthResolved,
       token,
       userRole,
       adminRole,
