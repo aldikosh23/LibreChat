@@ -1,7 +1,14 @@
 import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useWatch } from 'react-hook-form';
-import { BrainCircuit } from 'lucide-react';
-import { TextareaAutosize } from '@librechat/client';
+import { BrainCircuit, ChevronDown } from 'lucide-react';
+import {
+  TextareaAutosize,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@librechat/client';
 import { useRecoilState, useRecoilValue } from 'recoil';
 import { Constants, isAssistantsEndpoint, isAgentsEndpoint } from 'librechat-data-provider';
 import type { TConversation } from 'librechat-data-provider';
@@ -434,26 +441,44 @@ const ChatForm = memo(function ChatForm({
               />
               <div className="mx-auto flex" />
               {balanceEndpoint === 'AIGate' && (
-                <label
-                  className="flex h-7 min-w-fit cursor-pointer items-center gap-1 rounded-full border border-border-light bg-surface-tertiary px-1.5 text-text-secondary transition-colors hover:bg-surface-hover"
-                  title={localize('com_endpoint_reasoning_effort')}
-                  onMouseDown={(event) => event.stopPropagation()}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <BrainCircuit className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
-                  <select
-                    className="w-[72px] cursor-pointer bg-transparent text-[11px] font-medium text-text-primary outline-none"
-                    value={conversation?.reasoning_effort ?? ''}
-                    onChange={(event) => setOption('reasoning_effort')(event.target.value)}
-                    aria-label={localize('com_endpoint_reasoning_effort')}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-7 min-w-fit items-center gap-1 rounded-full border border-border-light bg-surface-tertiary px-2 text-[11px] font-medium text-text-primary transition-colors hover:bg-surface-hover"
+                      title={localize('com_endpoint_reasoning_effort')}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <BrainCircuit className="h-3.5 w-3.5 text-text-tertiary" />
+                      <span>
+                        {conversation?.reasoning_effort
+                          ? localize(`com_ui_${conversation.reasoning_effort}`)
+                          : localize('com_ui_off')}
+                      </span>
+                      <ChevronDown className="h-3 w-3 text-text-tertiary" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    side="top"
+                    align="end"
+                    className="min-w-[112px] border-border-medium bg-surface-primary"
                   >
-                    <option value="">{localize('com_ui_off')}</option>
-                    <option value="low">{localize('com_ui_low')}</option>
-                    <option value="medium">{localize('com_ui_medium')}</option>
-                    <option value="high">{localize('com_ui_high')}</option>
-                    <option value="xhigh">{localize('com_ui_xhigh')}</option>
-                  </select>
-                </label>
+                    <DropdownMenuRadioGroup
+                      value={conversation?.reasoning_effort ?? ''}
+                      onValueChange={setOption('reasoning_effort')}
+                    >
+                      {['', 'low', 'medium', 'high', 'xhigh'].map((effort) => (
+                        <DropdownMenuRadioItem
+                          key={effort || 'off'}
+                          value={effort}
+                          className="cursor-pointer text-xs"
+                        >
+                          {localize(effort ? `com_ui_${effort}` : 'com_ui_off')}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               <AigateBalanceMeter
                 index={index}
@@ -533,6 +558,7 @@ function ChatFormWrapper({ index = 0, placeholder }: { index?: number; placehold
       conversation?.useResponsesApi,
       conversation?.model,
       conversation?.maxContextTokens,
+      conversation?.reasoning_effort,
       hasMessages,
     ],
   );
