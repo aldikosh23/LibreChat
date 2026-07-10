@@ -1,5 +1,6 @@
 import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useWatch } from 'react-hook-form';
+import { BrainCircuit } from 'lucide-react';
 import { TextareaAutosize } from '@librechat/client';
 import { useRecoilState, useRecoilValue } from 'recoil';
 import { Constants, isAssistantsEndpoint, isAgentsEndpoint } from 'librechat-data-provider';
@@ -434,14 +435,14 @@ const ChatForm = memo(function ChatForm({
               <div className="mx-auto flex" />
               {balanceEndpoint === 'AIGate' && (
                 <label
-                  className="flex min-w-fit items-center gap-1 rounded-full border border-border-light bg-surface-tertiary px-2 py-1 text-xs text-text-secondary"
+                  className="flex h-7 min-w-fit cursor-pointer items-center gap-1 rounded-full border border-border-light bg-surface-tertiary px-1.5 text-text-secondary transition-colors hover:bg-surface-hover"
                   title={localize('com_endpoint_reasoning_effort')}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
                 >
-                  <span className="hidden sm:inline">
-                    {localize('com_endpoint_reasoning_effort')}
-                  </span>
+                  <BrainCircuit className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
                   <select
-                    className="bg-transparent text-text-primary outline-none"
+                    className="w-[72px] cursor-pointer bg-transparent text-[11px] font-medium text-text-primary outline-none"
                     value={conversation?.reasoning_effort ?? ''}
                     onChange={(event) => setOption('reasoning_effort')(event.target.value)}
                     aria-label={localize('com_endpoint_reasoning_effort')}
