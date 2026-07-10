@@ -102,6 +102,7 @@ class ModelEndHandler {
       if (!usage) {
         return this.finalize(errorMessage);
       }
+      const responseCost = data?.output?.response_metadata?.usage?.cost_usd;
       const modelName = metadata?.ls_model_name || agentContext.clientOptions?.model;
       if (modelName) {
         usage.model = modelName;
@@ -149,6 +150,10 @@ class ModelEndHandler {
             model: taggedUsage.model,
             provider: taggedUsage.provider,
             usage_type: taggedUsage.usage_type,
+            cost:
+              typeof responseCost === 'number' && Number.isFinite(responseCost)
+                ? responseCost
+                : undefined,
             /** Producing agent for per-endpoint pricing; consumed by the emit
              *  cost resolver and not included in the emitted/persisted payload. */
             agentId: taggedUsage.agentId,
@@ -318,7 +323,7 @@ function getDefaultHandlers({
    */
   const emitTokenUsage = ({ agentId, ...data }) => {
     let payload = data;
-    if (usageCost?.enabled === true && usageCost.pricing) {
+    if (data.cost == null && usageCost?.enabled === true && usageCost.pricing) {
       try {
         /** Price with the producing agent's config (multi-endpoint graphs) so
          *  the streamed/persisted cost matches the per-agent balance transaction;

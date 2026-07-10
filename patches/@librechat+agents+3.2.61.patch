@@ -1,0 +1,177 @@
+diff --git a/node_modules/@librechat/agents/src/graphs/Graph.ts b/node_modules/@librechat/agents/src/graphs/Graph.ts
+index 03d268c..b3adcb5 100644
+--- a/node_modules/@librechat/agents/src/graphs/Graph.ts
++++ b/node_modules/@librechat/agents/src/graphs/Graph.ts
+@@ -225,6 +225,16 @@ function isGoogleServerSideToolMessageContentPart(
+   );
+ }
+ 
++function isMediaMessageContentPart(
++  contentPart: MessageContent[number] | t.MessageContentComplex
++): boolean {
++  return (
++    typeof contentPart === 'object' &&
++    'type' in contentPart &&
++    (contentPart.type === ContentTypes.IMAGE_URL || contentPart.type === ContentTypes.VIDEO_URL)
++  );
++}
++
+ function hasGoogleServerSideToolDeltaContent(
+   provider: Providers | undefined,
+   content: t.MessageDelta['content']
+@@ -259,7 +269,12 @@ function getMessageDeltaContent(
+     content.some((contentPart) =>
+       isGoogleServerSideToolMessageContentPart(contentPart)
+     );
+-  if (content.every((contentPart) => isTextMessageContentPart(contentPart))) {
++  if (
++    content.every(
++      (contentPart) =>
++        isTextMessageContentPart(contentPart) || isMediaMessageContentPart(contentPart)
++    )
++  ) {
+     return content as t.MessageDelta['content'];
+   }
+   if (!hasGoogleServerSideToolPart) {
+@@ -268,6 +283,7 @@ function getMessageDeltaContent(
+   const messageContent = content.filter(
+     (contentPart) =>
+       isTextMessageContentPart(contentPart) ||
++      isMediaMessageContentPart(contentPart) ||
+       isGoogleServerSideToolMessageContentPart(contentPart)
+   );
+   return messageContent.length > 0
+@@ -396,7 +412,10 @@ async function dispatchTextMessageContent({
+   if (!messageId) {
+     return false;
+   }
+-  if (hasGoogleServerSideToolDeltaContent(provider, content)) {
++  if (
++    hasGoogleServerSideToolDeltaContent(provider, content) ||
++    content.some((contentPart) => isMediaMessageContentPart(contentPart))
++  ) {
+     for (const contentPart of content) {
+       const stepId = await dispatchMessageCreationStep({
+         graph,
+diff --git a/node_modules/@librechat/agents/src/stream.ts b/node_modules/@librechat/agents/src/stream.ts
+index 4830b35..16e44a5 100644
+--- a/node_modules/@librechat/agents/src/stream.ts
++++ b/node_modules/@librechat/agents/src/stream.ts
+@@ -1891,13 +1891,12 @@ export function createContentAggregator(): t.ContentAggregatorResult {
+       partType === ContentTypes.IMAGE_URL &&
+       'image_url' in contentPart
+     ) {
+-      const currentContent = contentParts[index] as {
+-        type: 'image_url';
+-        image_url: string;
+-      };
+-      contentParts[index] = {
+-        ...currentContent,
+-      };
++      contentParts[index] = contentPart;
++    } else if (
++      partType === ContentTypes.VIDEO_URL &&
++      'video_url' in contentPart
++    ) {
++      contentParts[index] = contentPart;
+     } else if (
+       partType === ContentTypes.TOOL_CALL &&
+       'tool_call' in contentPart
+diff --git a/node_modules/@librechat/agents/dist/cjs/graphs/Graph.cjs b/node_modules/@librechat/agents/dist/cjs/graphs/Graph.cjs
+index 62f4ef3..410c177 100644
+--- a/node_modules/@librechat/agents/dist/cjs/graphs/Graph.cjs
++++ b/node_modules/@librechat/agents/dist/cjs/graphs/Graph.cjs
+@@ -95,6 +95,9 @@ function isTextMessageContentPart(contentPart) {
+ function isGoogleServerSideToolMessageContentPart(contentPart) {
+ 	return typeof contentPart === "object" && "type" in contentPart && (contentPart.type === "toolCall" || contentPart.type === "toolResponse");
+ }
++function isMediaMessageContentPart(contentPart) {
++	return typeof contentPart === "object" && "type" in contentPart && (contentPart.type === "image_url" || contentPart.type === "video_url");
++}
+ function hasGoogleServerSideToolDeltaContent(provider, content) {
+ 	return require_llm.isGoogleLike(provider) && Array.isArray(content) && content.some((contentPart) => isGoogleServerSideToolMessageContentPart(contentPart));
+ }
+@@ -106,9 +109,9 @@ function getMessageDeltaContent(provider, content) {
+ 	}] : void 0;
+ 	if (content.length === 0) return;
+ 	const hasGoogleServerSideToolPart = require_llm.isGoogleLike(provider) && content.some((contentPart) => isGoogleServerSideToolMessageContentPart(contentPart));
+-	if (content.every((contentPart) => isTextMessageContentPart(contentPart))) return content;
++	if (content.every((contentPart) => isTextMessageContentPart(contentPart) || isMediaMessageContentPart(contentPart))) return content;
+ 	if (!hasGoogleServerSideToolPart) return;
+-	const messageContent = content.filter((contentPart) => isTextMessageContentPart(contentPart) || isGoogleServerSideToolMessageContentPart(contentPart));
++	const messageContent = content.filter((contentPart) => isTextMessageContentPart(contentPart) || isMediaMessageContentPart(contentPart) || isGoogleServerSideToolMessageContentPart(contentPart));
+ 	return messageContent.length > 0 ? messageContent : void 0;
+ }
+ function hasTextDeltaContent(content) {
+@@ -163,7 +166,7 @@ async function dispatchMessageCreationStep({ graph, stepKey, messageId, metadata
+ async function dispatchTextMessageContent({ graph, stepKey, provider, content, metadata }) {
+ 	const messageId = require_ids.getMessageId(stepKey, graph) ?? "";
+ 	if (!messageId) return false;
+-	if (hasGoogleServerSideToolDeltaContent(provider, content)) {
++	if (hasGoogleServerSideToolDeltaContent(provider, content) || content.some((contentPart) => isMediaMessageContentPart(contentPart))) {
+ 		for (const contentPart of content) {
+ 			const stepId = await dispatchMessageCreationStep({
+ 				graph,
+diff --git a/node_modules/@librechat/agents/dist/esm/graphs/Graph.mjs b/node_modules/@librechat/agents/dist/esm/graphs/Graph.mjs
+index a82ae8d..fc89ead 100644
+--- a/node_modules/@librechat/agents/dist/esm/graphs/Graph.mjs
++++ b/node_modules/@librechat/agents/dist/esm/graphs/Graph.mjs
+@@ -95,6 +95,9 @@ function isTextMessageContentPart(contentPart) {
+ function isGoogleServerSideToolMessageContentPart(contentPart) {
+ 	return typeof contentPart === "object" && "type" in contentPart && (contentPart.type === "toolCall" || contentPart.type === "toolResponse");
+ }
++function isMediaMessageContentPart(contentPart) {
++	return typeof contentPart === "object" && "type" in contentPart && (contentPart.type === "image_url" || contentPart.type === "video_url");
++}
+ function hasGoogleServerSideToolDeltaContent(provider, content) {
+ 	return isGoogleLike(provider) && Array.isArray(content) && content.some((contentPart) => isGoogleServerSideToolMessageContentPart(contentPart));
+ }
+@@ -106,9 +109,9 @@ function getMessageDeltaContent(provider, content) {
+ 	}] : void 0;
+ 	if (content.length === 0) return;
+ 	const hasGoogleServerSideToolPart = isGoogleLike(provider) && content.some((contentPart) => isGoogleServerSideToolMessageContentPart(contentPart));
+-	if (content.every((contentPart) => isTextMessageContentPart(contentPart))) return content;
++	if (content.every((contentPart) => isTextMessageContentPart(contentPart) || isMediaMessageContentPart(contentPart))) return content;
+ 	if (!hasGoogleServerSideToolPart) return;
+-	const messageContent = content.filter((contentPart) => isTextMessageContentPart(contentPart) || isGoogleServerSideToolMessageContentPart(contentPart));
++	const messageContent = content.filter((contentPart) => isTextMessageContentPart(contentPart) || isMediaMessageContentPart(contentPart) || isGoogleServerSideToolMessageContentPart(contentPart));
+ 	return messageContent.length > 0 ? messageContent : void 0;
+ }
+ function hasTextDeltaContent(content) {
+@@ -163,7 +166,7 @@ async function dispatchMessageCreationStep({ graph, stepKey, messageId, metadata
+ async function dispatchTextMessageContent({ graph, stepKey, provider, content, metadata }) {
+ 	const messageId = getMessageId(stepKey, graph) ?? "";
+ 	if (!messageId) return false;
+-	if (hasGoogleServerSideToolDeltaContent(provider, content)) {
++	if (hasGoogleServerSideToolDeltaContent(provider, content) || content.some((contentPart) => isMediaMessageContentPart(contentPart))) {
+ 		for (const contentPart of content) {
+ 			const stepId = await dispatchMessageCreationStep({
+ 				graph,
+diff --git a/node_modules/@librechat/agents/dist/cjs/stream.cjs b/node_modules/@librechat/agents/dist/cjs/stream.cjs
+index 65cc048..15d8076 100644
+--- a/node_modules/@librechat/agents/dist/cjs/stream.cjs
++++ b/node_modules/@librechat/agents/dist/cjs/stream.cjs
+@@ -816,7 +816,8 @@ function createContentAggregator() {
+ 				...incoming,
+ 				content: [...currentSummary?.content ?? [], ...incoming.content ?? []]
+ 			};
+-		} else if (partType === "image_url" && "image_url" in contentPart) contentParts[index] = { ...contentParts[index] };
++		} else if (partType === "image_url" && "image_url" in contentPart) contentParts[index] = contentPart;
++		else if (partType === "video_url" && "video_url" in contentPart) contentParts[index] = contentPart;
+ 		else if (partType === "tool_call" && "tool_call" in contentPart) {
+ 			const incomingName = contentPart.tool_call.name;
+ 			const incomingId = contentPart.tool_call.id;
+diff --git a/node_modules/@librechat/agents/dist/esm/stream.mjs b/node_modules/@librechat/agents/dist/esm/stream.mjs
+index c688bdb..ecea7ae 100644
+--- a/node_modules/@librechat/agents/dist/esm/stream.mjs
++++ b/node_modules/@librechat/agents/dist/esm/stream.mjs
+@@ -815,7 +815,8 @@ function createContentAggregator() {
+ 				...incoming,
+ 				content: [...currentSummary?.content ?? [], ...incoming.content ?? []]
+ 			};
+-		} else if (partType === "image_url" && "image_url" in contentPart) contentParts[index] = { ...contentParts[index] };
++		} else if (partType === "image_url" && "image_url" in contentPart) contentParts[index] = contentPart;
++		else if (partType === "video_url" && "video_url" in contentPart) contentParts[index] = contentPart;
+ 		else if (partType === "tool_call" && "tool_call" in contentPart) {
+ 			const incomingName = contentPart.tool_call.name;
+ 			const incomingId = contentPart.tool_call.id;

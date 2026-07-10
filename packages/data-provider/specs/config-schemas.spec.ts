@@ -1114,6 +1114,24 @@ describe('summarizationTriggerSchema', () => {
   });
 });
 
+describe('summarization maxContextTokens', () => {
+  it('keeps a positive context limit in the parsed config', () => {
+    const result = summarizationConfigSchema.safeParse({
+      enabled: true,
+      maxContextTokens: 200_000,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.maxContextTokens).toBe(200_000);
+    }
+  });
+
+  it.each([0, -1, Infinity, NaN])('rejects invalid context limit %s', (maxContextTokens) => {
+    expect(summarizationConfigSchema.safeParse({ maxContextTokens }).success).toBe(false);
+  });
+});
+
 describe('retainRecentConfigSchema', () => {
   it('accepts turn and token retention limits', () => {
     const result = retainRecentConfigSchema.safeParse({

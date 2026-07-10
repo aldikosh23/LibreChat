@@ -6,6 +6,30 @@ import { getFileStream, getConfiguredFileSizeLimit } from './utils';
 import { validateVideo } from '~/files/validation';
 import { runGuardedEncode } from './memoryGuard';
 
+export function formatVideoBlock(
+  provider: Providers,
+  endpoint: string | undefined,
+  mimeType: string,
+  content: string,
+):
+  | { type: 'media'; mimeType: string; data: string }
+  | { type: 'video_url'; video_url: { url: string } }
+  | null {
+  if (provider === Providers.GOOGLE || provider === Providers.VERTEXAI) {
+    return { type: 'media' as const, mimeType, data: content };
+  }
+  if (
+    provider === Providers.OPENROUTER ||
+    (provider === Providers.OPENAI && endpoint?.toLowerCase() === 'aigate')
+  ) {
+    return {
+      type: 'video_url' as const,
+      video_url: { url: `data:${mimeType};base64,${content}` },
+    };
+  }
+  return null;
+}
+
 /**
  * Encodes and formats video files for different providers
  * @param req - The request object
@@ -78,20 +102,8 @@ export async function encodeAndFormatVideos(
       throw new Error(`Video validation failed: ${validation.error}`);
     }
 
-    if (provider === Providers.GOOGLE || provider === Providers.VERTEXAI) {
-      result.videos.push({
-        type: 'media',
-        mimeType: file.type,
-        data: content,
-      });
-    } else if (provider === Providers.OPENROUTER) {
-      result.videos.push({
-        type: 'video_url',
-        video_url: {
-          url: `data:${file.type};base64,${content}`,
-        },
-      });
-    }
+    const block = formatVideoBlock(provider, endpoint, file.type, content);
+    if (block) result.videos.push(block);
 
     result.files.push(metadata);
   }

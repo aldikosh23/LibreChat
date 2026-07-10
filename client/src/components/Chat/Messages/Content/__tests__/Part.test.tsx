@@ -59,7 +59,16 @@ jest.mock('../ToolCall', () => ({
 
 jest.mock('../Image', () => ({
   __esModule: true,
-  default: () => <div data-testid="image" />,
+  default: ({ imagePath }: { imagePath: string }) => (
+    <div data-testid="image" data-src={imagePath} />
+  ),
+}));
+
+jest.mock('../Video', () => ({
+  __esModule: true,
+  default: ({ videoPath }: { videoPath: string }) => (
+    <div data-testid="video" data-src={videoPath} />
+  ),
 }));
 
 jest.mock('~/utils', () => ({
@@ -130,5 +139,28 @@ describe('Part tool renderer selection', () => {
       'edit_file',
     );
     expect(screen.queryByTestId('tool-call')).not.toBeInTheDocument();
+  });
+});
+
+describe('Part media renderer selection', () => {
+  it('renders provider image URL content', () => {
+    renderPart({
+      type: ContentTypes.IMAGE_URL,
+      image_url: { url: 'data:image/png;base64,abc' },
+    } as TMessageContentParts);
+
+    expect(screen.getByTestId('image')).toHaveAttribute('data-src', 'data:image/png;base64,abc');
+  });
+
+  it('renders provider video URL content', () => {
+    renderPart({
+      type: ContentTypes.VIDEO_URL,
+      video_url: { url: 'https://aigate.shop/v1/media/video.mp4' },
+    } as TMessageContentParts);
+
+    expect(screen.getByTestId('video')).toHaveAttribute(
+      'data-src',
+      'https://aigate.shop/v1/media/video.mp4',
+    );
   });
 });

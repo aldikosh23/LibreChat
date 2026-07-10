@@ -1,6 +1,7 @@
 import type { TMessage } from 'librechat-data-provider';
 import {
   formatAigateUsd,
+  getAigateBalanceEndpoint,
   getAigateMessageCost,
   getAigateStoredMessageCost,
   getAigateUsageCostDelta,
@@ -85,6 +86,15 @@ describe('aigate billing helpers', () => {
     } as TMessage;
 
     expect(getAigateMessageCost(message)).toBe(0.012345);
+  });
+
+  it('uses the custom agent provider name for balance requests', () => {
+    expect(
+      getAigateBalanceEndpoint({
+        endpoint: 'agents',
+        agentProvider: 'AIGate',
+      }),
+    ).toBe('AIGate');
   });
 
   it('persists local fallback costs by conversation and message', () => {

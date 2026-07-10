@@ -408,12 +408,14 @@ export default function useStepHandler({
 
       updatedContent[index] = update;
     } else if (contentType === ContentTypes.IMAGE_URL && 'image_url' in contentPart) {
-      const currentContent = updatedContent[index] as {
-        type: ContentTypes.IMAGE_URL;
-        image_url: string;
-      };
       updatedContent[index] = {
-        ...currentContent,
+        type: ContentTypes.IMAGE_URL,
+        image_url: contentPart.image_url,
+      };
+    } else if (contentType === ContentTypes.VIDEO_URL && 'video_url' in contentPart) {
+      updatedContent[index] = {
+        type: ContentTypes.VIDEO_URL,
+        video_url: contentPart.video_url,
       };
     } else if (contentType === ContentTypes.SUMMARY) {
       const currentSummary = updatedContent[index] as SummaryContentPart | undefined;

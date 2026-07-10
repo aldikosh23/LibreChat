@@ -189,6 +189,25 @@ describe('ModelEndHandler — Vertex thoughtSignature capture (issue #13006 foll
     expect(emitUsage).toHaveBeenCalledWith(expect.objectContaining({ agentId: undefined }));
   });
 
+  it('emits the upstream response cost as usage cost', async () => {
+    const emitUsage = jest.fn();
+    const handler = new ModelEndHandler([], null, emitUsage);
+
+    await handler.handle(
+      'on_chat_model_end',
+      {
+        output: {
+          usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+          response_metadata: { usage: { cost_usd: 0.001234 } },
+        },
+      },
+      { ls_model_name: 'gpt-4', run_id: 'r1', user_id: 'u1' },
+      buildGraph(),
+    );
+
+    expect(emitUsage).toHaveBeenCalledWith(expect.objectContaining({ cost: 0.001234 }));
+  });
+
   it('throws when collectedUsage is not an array (existing contract)', () => {
     expect(() => new ModelEndHandler(null)).toThrow('collectedUsage must be an array');
   });

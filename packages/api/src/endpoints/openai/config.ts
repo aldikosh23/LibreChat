@@ -12,6 +12,7 @@ import { getProxyDispatcher } from '~/utils/proxy';
 import { constructAzureURL } from '~/utils/azure';
 import { createFetch } from '~/utils/generators';
 import { mergeHeaders } from '~/utils/headers';
+import { createAigateMediaFetch } from './aigateMedia';
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type FetchOptions = RequestInit & { dispatcher?: Dispatcher };
@@ -291,6 +292,10 @@ export function getOpenAIConfig(
       ssrfAgents,
       redirect: shouldProtectUserBaseURL ? 'error' : undefined,
     }) as unknown as Fetch;
+  }
+
+  if (endpoint?.toLowerCase() === 'aigate') {
+    configOptions.fetch = createAigateMediaFetch(configOptions.fetch as Fetch | undefined);
   }
 
   const result: t.OpenAIConfigResult = {

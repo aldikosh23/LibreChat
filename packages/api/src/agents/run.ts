@@ -263,6 +263,12 @@ export function getReasoningKey(
 
 const DEEPSEEK_MODEL_PATTERN = /^deepseek(?:[-/]|$)/i;
 const OPENROUTER_LATEST_ROUTING_PREFIX = /^~/;
+const MEDIA_OUTPUT_MODEL_PATTERN =
+  /image|video|gemini-omni|flux|muse|dall-e|imagen|ideogram|recraft|seedream|midjourney|stable-diffusion|veo|sora|kling|seedance|(?:^|[/_.-])(?:t2v|i2v|wan|runway|pixverse|skyreels)(?=$|[/_.-])/i;
+
+function isMediaOutputModel(model?: string): boolean {
+  return typeof model === 'string' && MEDIA_OUTPUT_MODEL_PATTERN.test(model);
+}
 
 function matchesDeepSeekModel(model?: string | null): boolean {
   if (typeof model !== 'string' || model.length === 0) {
@@ -627,7 +633,11 @@ function shapeSummarizationConfig(
       : config?.parameters;
 
   return {
-    enabled: config?.enabled !== false && isNonEmptyString(provider) && isNonEmptyString(model),
+    enabled:
+      !isMediaOutputModel(fallbackModel) &&
+      config?.enabled !== false &&
+      isNonEmptyString(provider) &&
+      isNonEmptyString(model),
     config: {
       trigger,
       provider,
@@ -641,6 +651,7 @@ function shapeSummarizationConfig(
     } satisfies AgentSummarizationConfig,
     contextPruning: config?.contextPruning as ContextPruningConfig | undefined,
     reserveRatio: config?.reserveRatio,
+    maxContextTokens: config?.maxContextTokens,
   };
 }
 
@@ -1173,11 +1184,18 @@ export async function createRun({
       }
     }
 
-    const effectiveMaxContextTokens = computeEffectiveMaxContextTokens(
+    const computedMaxContextTokens = computeEffectiveMaxContextTokens(
       summarization.reserveRatio,
       agent.baseContextTokens,
       agent.maxContextTokens,
     );
+    const effectiveMaxContextTokens =
+      summarization.enabled && summarization.maxContextTokens != null
+        ? Math.min(
+            computedMaxContextTokens ?? summarization.maxContextTokens,
+            summarization.maxContextTokens,
+          )
+        : computedMaxContextTokens;
 
     const reasoningKey = getReasoningKey(provider, llmConfig, agent.endpoint, agent.reasoningKey);
     const agentInput: AgentInputs = {

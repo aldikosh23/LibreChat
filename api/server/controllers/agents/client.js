@@ -98,6 +98,12 @@ const { resolveConfigServers } = require('~/server/services/MCP');
 const { getMCPServerTools } = require('~/server/services/Config');
 const BaseClient = require('~/app/clients/BaseClient');
 const { getMCPManager } = require('~/config');
+const {
+  buildAigateImageRequest,
+  extractAigateImageInput,
+  isAigateImageModel,
+  parseAigateImageResponse,
+} = require('~/server/services/aigateImage');
 const db = require('~/models');
 
 const loadAgent = (params) => loadAgentFn(params, { getAgent: db.getAgent, getMCPServerTools });
@@ -1039,6 +1045,72 @@ class AgentClient extends BaseClient {
   }
 
   /**
+   * GPT Image models use the OpenAI image endpoints rather than chat completions.
+   * The AIGate custom endpoint still supplies the user's server-managed key.
+   * @param {BaseMessage[]} messages
+   * @param {AbortSignal} signal
+   */
+  async runAigateImageRequest(messages, signal) {
+    const params = this.options.agent?.model_parameters ?? {};
+    const model = params.model ?? this.model;
+    const configuration = params.configuration ?? {};
+    const baseURL = configuration.baseURL ?? process.env.AIGATE_API_BASE_URL;
+    const apiKey = params.apiKey;
+
+    if (!baseURL || !apiKey) {
+      throw new Error('AIGate image endpoint is not configured');
+    }
+
+    const { prompt, imageUrls } = extractAigateImageInput(messages);
+    if (!prompt) {
+      throw new Error('Image prompt is empty');
+    }
+
+    const request = buildAigateImageRequest({ model, prompt, imageUrls });
+    const url = new URL(request.path, `${String(baseURL).replace(/\/+$/, '')}/`);
+    const upstream = await fetch(url, {
+      method: 'POST',
+      signal,
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(request.body),
+    });
+    const payload = await upstream.json().catch(() => null);
+
+    if (!upstream.ok) {
+      const message = payload?.error?.message ?? payload?.error;
+      throw new Error(message || `AIGate image request failed (${upstream.status})`);
+    }
+
+    const images = parseAigateImageResponse(payload);
+    if (images.length === 0) {
+      throw new Error('AIGate returned no image');
+    }
+
+    this.contentParts.push(
+      ...images.map((url) => ({
+        type: ContentTypes.IMAGE_URL,
+        [ContentTypes.IMAGE_URL]: { url },
+      })),
+    );
+
+    const usage = payload?.usage;
+    if (usage && this.usageEmitSink) {
+      this.usageEmitSink.push({
+        input_tokens: usage.prompt_tokens ?? 0,
+        output_tokens: usage.completion_tokens ?? 0,
+        total_tokens: usage.total_tokens ?? 0,
+        cost: usage.cost_usd,
+        model,
+        provider: 'AIGate',
+        runId: this.responseMessageId,
+      });
+    }
+  }
+
+  /**
    * @param {Object} params
    * @param {string} [params.model]
    * @param {string} [params.context='message']
@@ -1507,6 +1579,11 @@ class AgentClient extends BaseClient {
         indexTokenCountMap,
         tokenCounter,
       });
+
+      if (isAigateImageModel(this.options.agent?.provider, this.model)) {
+        await this.runAigateImageRequest(initialMessages, abortController.signal);
+        return;
+      }
 
       const memoryMessages =
         this.processMemory && this.memoryPayload

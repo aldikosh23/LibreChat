@@ -317,6 +317,81 @@ describe('reserveRatio', () => {
   });
 });
 
+describe('summarization context limit', () => {
+  const summarizationConfig = {
+    enabled: true,
+    provider: 'AIGate',
+    model: 'openai/gpt-5.4-mini',
+    maxContextTokens: 200_000,
+    reserveRatio: 0,
+  } as SummarizationConfig;
+
+  it('caps text models at the configured summarization context limit', async () => {
+    const agents = await callAndCapture({
+      agents: [
+        makeAgent({
+          endpoint: 'AIGate',
+          model: 'openai/gpt-5.5',
+          model_parameters: { model: 'openai/gpt-5.5' },
+          baseContextTokens: 1_000_000,
+          maxContextTokens: 950_000,
+        }),
+      ],
+      summarizationConfig,
+    });
+
+    expect(agents[0].summarizationEnabled).toBe(true);
+    expect(agents[0].maxContextTokens).toBe(200_000);
+  });
+
+  it('keeps a text model context limit that is already below the configured limit', async () => {
+    const agents = await callAndCapture({
+      agents: [
+        makeAgent({
+          endpoint: 'AIGate',
+          model: 'qwen/qwen2.5-vl-72b-instruct',
+          model_parameters: { model: 'qwen/qwen2.5-vl-72b-instruct' },
+          maxContextTokens: 128_000,
+        }),
+      ],
+      summarizationConfig,
+    });
+
+    expect(agents[0].summarizationEnabled).toBe(true);
+    expect(agents[0].maxContextTokens).toBe(128_000);
+  });
+
+  it.each([
+    'google/gemini-3-pro-image',
+    'google/gemini-3.1-flash-image-preview',
+    'google/gemini-3.1-flash-lite-image',
+    'openai/gpt-image-2',
+    'black-forest-labs/flux-2-pro',
+    'meta/muse-spark-1.1',
+    'google/gemini-omni-flash-preview',
+    'x-ai/grok-imagine-video',
+    'google/veo-3.1',
+    'bytedance/seedance-2.0-fast',
+    'klingai/kling-v2.6',
+  ])('fully disables summarization for media model %s', async (model) => {
+    const agents = await callAndCapture({
+      agents: [
+        makeAgent({
+          endpoint: 'AIGate',
+          model,
+          model_parameters: { model },
+          baseContextTokens: 1_000_000,
+          maxContextTokens: 950_000,
+        }),
+      ],
+      summarizationConfig,
+    });
+
+    expect(agents[0].summarizationEnabled).toBe(false);
+    expect(agents[0].maxContextTokens).toBe(950_000);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Suite 2: maxSummaryTokens passthrough
 // ---------------------------------------------------------------------------

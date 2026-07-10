@@ -6,6 +6,11 @@ export type AigateBalanceSnapshot = {
   unlimited: boolean;
 };
 
+type AigateBalanceEndpointParams = {
+  endpoint?: string | null;
+  agentProvider?: string | null;
+};
+
 const STORAGE_PREFIX = 'aigate:message-cost';
 
 function readNumber(value: unknown): number | null {
@@ -24,6 +29,13 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     return null;
   }
   return value as Record<string, unknown>;
+}
+
+export function getAigateBalanceEndpoint({
+  endpoint,
+  agentProvider,
+}: AigateBalanceEndpointParams): string | null {
+  return agentProvider ?? endpoint ?? null;
 }
 
 export function parseAigateBalance(payload: unknown): AigateBalanceSnapshot | null {

@@ -19,6 +19,7 @@ import {
   useChatContext,
   useChatFormContext,
   useAddedChatContext,
+  useAgentsMapContext,
   useAssistantsMapContext,
 } from '~/Providers';
 import PendingManualSkillsChips from './PendingManualSkillsChips';
@@ -44,6 +45,7 @@ import EditBadges from './EditBadges';
 import BadgeRow from './BadgeRow';
 import Mention from './Mention';
 import AigateBalanceMeter from './AigateBalanceMeter';
+import { getAigateBalanceEndpoint } from '~/utils/aigateBilling';
 import store from '~/store';
 
 interface ChatFormProps {
@@ -104,6 +106,7 @@ const ChatForm = memo(function ChatForm({
     conversation: addedConvo,
     setConversation: setAddedConvo,
   } = useAddedChatContext();
+  const agentsMap = useAgentsMapContext();
   const assistantMap = useAssistantsMapContext();
   const { data: startupConfig } = useGetStartupConfig();
 
@@ -120,6 +123,12 @@ const ChatForm = memo(function ChatForm({
     () => conversation?.conversationId ?? Constants.NEW_CONVO,
     [conversation?.conversationId],
   );
+  const balanceEndpoint = getAigateBalanceEndpoint({
+    endpoint: conversation?.endpoint,
+    agentProvider: conversation?.agent_id
+      ? agentsMap?.[conversation.agent_id]?.provider
+      : undefined,
+  });
   /**
    * The quote feature merges excerpts server-side in `BaseClient.sendMessage`,
    * which the Assistants endpoints bypass — so hide the UI there rather than
@@ -423,7 +432,7 @@ const ChatForm = memo(function ChatForm({
               <div className="mx-auto flex" />
               <AigateBalanceMeter
                 index={index}
-                endpoint={conversation?.endpoint ?? endpoint}
+                endpoint={balanceEndpoint}
                 conversationId={conversationId}
                 isSubmitting={isSubmitting}
               />

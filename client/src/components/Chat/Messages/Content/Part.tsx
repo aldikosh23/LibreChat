@@ -36,6 +36,7 @@ import Container from './Container';
 import WebSearch from './WebSearch';
 import ToolCall from './ToolCall';
 import Image from './Image';
+import Video from './Video';
 
 type PartProps = {
   part?: TMessageContentParts;
@@ -400,6 +401,11 @@ const Part = memo(function Part({
         />
       );
     }
+  } else if (part.type === ContentTypes.IMAGE_URL && 'image_url' in part) {
+    const imagePath = typeof part.image_url === 'string' ? part.image_url : part.image_url?.url;
+    return imagePath ? <Image imagePath={imagePath} altText="Generated image" /> : null;
+  } else if (part.type === ContentTypes.VIDEO_URL && 'video_url' in part) {
+    return part.video_url?.url ? <Video videoPath={part.video_url.url} /> : null;
   } else if (part.type === ContentTypes.IMAGE_FILE) {
     const imageFile = part[ContentTypes.IMAGE_FILE];
     const cached = imageFile.file_id ? getCachedPreview(imageFile.file_id) : undefined;

@@ -302,6 +302,46 @@ describe('usage events through the real agents pipeline', () => {
     expect(usage.cost).toBeCloseTo(usageEmitSink.reduce((sum, e) => sum + e.cost, 0));
   });
 
+  test('preserves upstream response cost in emitted and persisted usage', async () => {
+    const res = createMockRes();
+    const usageEmitSink = [];
+    const { aggregateContent } = createContentAggregator();
+    const handlers = getDefaultHandlers({
+      res,
+      aggregateContent,
+      toolEndCallback: () => {},
+      collectedUsage: [],
+      usageEmitSink,
+      usageCost: {
+        enabled: true,
+        pricing: {
+          getMultiplier: () => 999,
+          getCacheMultiplier: () => 999,
+        },
+      },
+    });
+
+    await handlers[GraphEvents.CHAT_MODEL_END].handle(
+      GraphEvents.CHAT_MODEL_END,
+      {
+        output: {
+          usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+          response_metadata: { usage: { cost_usd: 0.001234 } },
+        },
+      },
+      { ls_model_name: 'gpt-4', run_id: 'r1' },
+      {
+        getAgentContext: () => ({ provider: 'openAI', clientOptions: { model: 'gpt-4' } }),
+      },
+    );
+
+    expect(usageEmitSink[0].cost).toBe(0.001234);
+    expect(aggregateEmittedUsage(usageEmitSink)?.cost).toBe(0.001234);
+    expect(res.events).toContainEqual(
+      expect.objectContaining({ data: expect.objectContaining({ cost: 0.001234 }) }),
+    );
+  });
+
   test('emit path prices each call by its producing agent and strips the agentId tag', () => {
     const res = createMockRes();
     const usageEmitSink = [];
