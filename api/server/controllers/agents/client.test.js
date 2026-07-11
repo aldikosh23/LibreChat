@@ -103,7 +103,7 @@ describe('AgentClient - AIGate image endpoints', () => {
                   content: JSON.stringify({
                     action: 'generate',
                     aspect_ratio: '21:9',
-                    image_size: '4K',
+                    image_size: null,
                     quality: 'high',
                   }),
                 },

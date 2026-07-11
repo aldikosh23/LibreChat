@@ -1097,7 +1097,7 @@ class AgentClient extends BaseClient {
               {
                 role: 'system',
                 content:
-                  'Route an image request. Return JSON only with action (generate or edit), aspect_ratio (1:1, 16:9, 9:16, 21:9, 4:3, 3:4, 4:5, 5:4, or null), image_size (1K, 2K, 4K, or null), and quality (auto, low, medium, high, or null). Choose edit for an attached image, or when the user clearly refers to changing the previous image. Choose generate for a new image. Preserve the user intent; do not invent settings.',
+                  'Return JSON only: {"action":"generate|edit","aspect_ratio":null,"image_size":null,"quality":null}. Choose action in order: (1) current_image_count > 0 means edit; (2) words meaning new, different, or from scratch, including новая, новую, новое, другой, с нуля, mean generate; (3) previous_image_count > 0 plus a request to change the previous image means edit. Edit examples: поменяй фон, добавь ей шляпу, сделай ее в другом стиле, убери текст, подправь картинку; (4) otherwise generate. Copy only explicitly requested aspect_ratio (1:1,16:9,9:16,21:9,4:3,3:4,4:5,5:4), image_size (1K,2K,4K), and quality (auto,low,medium,high). 4K is image_size, not quality. Use null when absent.',
               },
               {
                 role: 'user',
@@ -1109,7 +1109,6 @@ class AgentClient extends BaseClient {
               },
             ],
             temperature: 0,
-            max_tokens: 700,
           }),
         },
       );
@@ -1120,7 +1119,7 @@ class AgentClient extends BaseClient {
         );
       }
 
-      plan = parseAigateImagePlan(plannerPayload?.choices?.[0]?.message?.content);
+      plan = { ...plan, ...parseAigateImagePlan(plannerPayload?.choices?.[0]?.message?.content) };
       if (currentImageUrls.length > 0) plan.action = 'edit';
       if (currentImageUrls.length === 0 && previousImageUrls.length === 0) plan.action = 'generate';
     } catch (error) {
