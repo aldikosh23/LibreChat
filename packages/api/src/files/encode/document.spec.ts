@@ -1,5 +1,5 @@
 import { Providers } from '@librechat/agents';
-import { mbToBytes } from 'librechat-data-provider';
+import { EModelEndpoint, mbToBytes } from 'librechat-data-provider';
 import type { AppConfig, IMongoFile } from '@librechat/data-schemas';
 import type { ServerRequest } from '~/types';
 import { encodeAndFormatDocuments } from './document';
@@ -747,6 +747,30 @@ describe('encodeAndFormatDocuments - fileConfig integration', () => {
         type: 'input_file',
         filename: 'test.pdf',
         file_data: `data:application/pdf;base64,${mockContent}`,
+      });
+    });
+
+    it('should format AIGate Google PDF as file_url', async () => {
+      const req = createMockRequest(15) as ServerRequest;
+      const file = createMockFile(10);
+      const mockContent = Buffer.from('test-pdf-content').toString('base64');
+      mockedGetFileStream.mockResolvedValue({ file, content: mockContent, metadata: file });
+      mockedValidatePdf.mockResolvedValue({ isValid: true });
+
+      const result = await encodeAndFormatDocuments(
+        req,
+        [file],
+        {
+          provider: EModelEndpoint.custom,
+          endpoint: 'AIGate',
+          model: 'google/gemini-3.1-flash-lite',
+        },
+        mockStrategyFunctions,
+      );
+
+      expect(result.documents[0]).toEqual({
+        type: 'file_url',
+        file_url: { url: `data:application/pdf;base64,${mockContent}` },
       });
     });
 

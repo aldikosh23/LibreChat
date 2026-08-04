@@ -97,6 +97,13 @@ export interface OpenAIInputFileBlock {
   file_data: string;
 }
 
+export interface AigateFileUrlBlock {
+  type: 'file_url';
+  file_url: {
+    url: string;
+  };
+}
+
 /** Bedrock Converse API document block (passthrough via @langchain/aws) */
 export interface BedrockDocumentBlock {
   type: 'document';
@@ -114,6 +121,7 @@ export type DocumentBlock =
   | GoogleDocumentBlock
   | OpenAIFileBlock
   | OpenAIInputFileBlock
+  | AigateFileUrlBlock
   | BedrockDocumentBlock;
 
 export interface DocumentResult {

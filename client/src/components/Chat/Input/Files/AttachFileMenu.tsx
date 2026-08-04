@@ -39,13 +39,14 @@ import { SharePointPickerDialog } from '~/components/SharePoint';
 import { useGetStartupConfig } from '~/data-provider';
 import { ephemeralAgentByConvoId } from '~/store';
 import { MenuItemProps } from '~/common';
-import { cn } from '~/utils';
+import { cn, isAigateNativePdfModel } from '~/utils';
 
 type FileUploadType =
   | 'image'
   | 'document'
   | 'image_document'
   | 'image_document_extended'
+  | 'image_video_audio'
   | 'image_document_video_audio';
 
 interface AttachFileMenuProps {
@@ -133,6 +134,8 @@ const AttachFileMenu = ({
         inputRef.current.accept = 'image/*,.heif,.heic,.pdf,application/pdf';
       } else if (fileType === 'image_document_extended') {
         inputRef.current.accept = `image/*,.heif,.heic,${bedrockDocumentExtensions}`;
+      } else if (fileType === 'image_video_audio') {
+        inputRef.current.accept = 'image/*,.heif,.heic,video/*,audio/*';
       } else if (fileType === 'image_document_video_audio') {
         inputRef.current.accept = 'image/*,.heif,.heic,.pdf,application/pdf,video/*,audio/*';
       } else {
@@ -176,12 +179,12 @@ const AttachFileMenu = ({
           onClick: () => {
             setToolResource(undefined);
             let fileType: Exclude<FileUploadType, 'image' | 'document'> = 'image_document';
-            if (
-              currentProvider === Providers.GOOGLE ||
-              currentProvider === Providers.OPENROUTER ||
-              isAigate
-            ) {
+            if (currentProvider === Providers.GOOGLE || currentProvider === Providers.OPENROUTER) {
               fileType = 'image_document_video_audio';
+            } else if (isAigate) {
+              fileType = isAigateNativePdfModel(conversation?.model)
+                ? 'image_document_video_audio'
+                : 'image_video_audio';
             } else if (
               currentProvider === Providers.BEDROCK ||
               endpointType === EModelEndpoint.bedrock
@@ -277,6 +280,7 @@ const AttachFileMenu = ({
     codeAllowedByAgent,
     fileSearchAllowedByAgent,
     setIsSharePointDialogOpen,
+    conversation?.model,
   ]);
 
   const menuTrigger = (

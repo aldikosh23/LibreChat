@@ -34,6 +34,8 @@ function formatDocumentBlock(
   content: string,
   filename: string | undefined,
   useResponsesApi: boolean | undefined,
+  endpoint?: string,
+  model?: string,
 ): DocumentBlock | null {
   if (provider === Providers.ANTHROPIC) {
     const document: AnthropicDocumentBlock = {
@@ -65,6 +67,19 @@ function formatDocumentBlock(
   }
 
   const resolvedFilename = filename ?? 'document';
+
+  if (
+    endpoint?.toLowerCase() === 'aigate' &&
+    mimeType === 'application/pdf' &&
+    /^google\//i.test(model ?? '')
+  ) {
+    return {
+      type: 'file_url',
+      file_url: {
+        url: `data:${mimeType};base64,${content}`,
+      },
+    };
+  }
 
   if (useResponsesApi) {
     return {
@@ -217,6 +232,8 @@ export async function encodeAndFormatDocuments(
         content,
         file.filename,
         useResponsesApi,
+        endpoint,
+        model,
       );
       if (block) {
         result.documents.push(block);
@@ -236,6 +253,8 @@ export async function encodeAndFormatDocuments(
         content,
         file.filename,
         useResponsesApi,
+        endpoint,
+        model,
       );
       if (block) {
         result.documents.push(block);

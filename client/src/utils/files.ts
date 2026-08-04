@@ -329,6 +329,7 @@ export type UploadOptionContext = {
   provider?: string | null;
   endpoint?: string | null;
   endpointType?: string | null;
+  model?: string | null;
   useResponsesApi?: boolean;
   fileSearchEnabled: boolean;
   codeEnabled: boolean;
@@ -338,6 +339,9 @@ export type UploadOptionContext = {
   fileConfig: FileConfig | null;
   endpointSupportedMimeTypes?: RegExp[];
 };
+
+export const isAigateNativePdfModel = (model?: string | null): boolean =>
+  /^(google|openai)\//i.test(model ?? '');
 
 const isProviderAttachType = (type: string, ctx: UploadOptionContext): boolean => {
   let currentProvider = (ctx.provider || ctx.endpoint) ?? '';
@@ -349,7 +353,7 @@ const isProviderAttachType = (type: string, ctx: UploadOptionContext): boolean =
       type.startsWith('image/') ||
       type.startsWith('video/') ||
       type.startsWith('audio/') ||
-      type === 'application/pdf'
+      (type === 'application/pdf' && isAigateNativePdfModel(ctx.model))
     );
   }
   const isAzureWithResponsesApi =
